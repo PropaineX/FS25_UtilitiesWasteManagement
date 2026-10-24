@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<GUI name="UWMFrame">
+    <GuiElement profile="fs25_menuContainer">
+        <GuiElement profile="fs25_menuHeaderPanel">
+            <Text profile="uwm_headerText" text="$l10n_uwm_menuTitle"/>
+            <Text profile="uwm_managerText" id="managerText"/>
+        </GuiElement>
+
+        <GuiElement profile="fs25_statisticsHeaderBox">
+            <Text profile="uwm_headerCell" position="0px 0px"    size="180px 20px" text="$l10n_uwm_column_good"/>
+            <Text profile="uwm_headerCell" position="180px 0px"  size="250px 20px" text="$l10n_uwm_column_farm"/>
+            <Text profile="uwm_headerCell" position="430px 0px"  size="150px 20px" text="$l10n_uwm_column_role"/>
+            <Text profile="uwm_headerCell" position="580px 0px"  size="260px 20px" text="$l10n_uwm_column_amount"/>
+            <Text profile="uwm_headerCell" position="840px 0px"  size="220px 20px" text="$l10n_uwm_column_price"/>
+            <Text profile="uwm_headerCell" position="1060px 0px" size="140px 20px" text="$l10n_uwm_column_repeat"/>
+            <Text profile="uwm_headerCellLeft" position="1200px 0px" size="320px 20px" text="$l10n_uwm_column_status"/>
+            <ThreePartBitmap profile="fs25_lineSeparatorBottom" position="0px -2dp"/>
+        </GuiElement>
+
+        <SmoothList profile="uwm_list" id="invoiceList" listSectionHeader="section">
+            <ListItem profile="uwm_listItem" name="invoiceRow">
+                <Text profile="uwm_rowCell" position="0px 0px"    size="180px 20px" name="good"/>
+                <Text profile="uwm_rowCell" position="180px 0px"  size="250px 20px" name="farm"/>
+                <Text profile="uwm_rowCell" position="430px 0px"  size="150px 20px" name="role"/>
+                <Text profile="uwm_rowCell" position="580px 0px"  size="260px 20px" name="amount"/>
+                <Text profile="uwm_rowCell" position="840px 0px"  size="220px 20px" name="price"/>
+                <Text profile="uwm_rowCell" position="1060px 0px" size="140px 20px" name="repeat"/>
+                <Text profile="uwm_rowCellLeft" position="1200px 0px" size="320px 20px" name="status"/>
+            </ListItem>
+            <ListItem profile="fs25_subCategoryListSectionHeader" name="section">
+                <Text profile="fs25_subCategoryListSectionHeaderTitle" name="title"/>
+            </ListItem>
+        </SmoothList>
+
+        <ThreePartBitmap profile="uwm_listSliderBox">
+            <Slider profile="fs25_listSlider" dataElementId="invoiceList"/>
+        </ThreePartBitmap>
+    </GuiElement>
+
+    <GUIProfiles>
+        <Profile name="uwm_headerText" extends="fs25_textDefault">
+            <size value="900px 64px"/>
+            <position value="0px 0px"/>
+            <textSize value="31px"/>
+            <textBold value="false"/>
+            <textUpperCase value="true"/>
+        </Profile>
+
+        <Profile name="uwm_managerText" extends="fs25_textDefault" with="anchorMiddleRight">
+            <size value="700px 64px"/>
+            <position value="-20px 0px"/>
+            <textSize value="18px"/>
+            <textAlignment value="right"/>
+        </Profile>
+
+        <Profile name="uwm_list" extends="emptyPanel" with="anchorStretchingYLeft pivotTopLeft">
+            <position value="0px -40px"/>
+        </Profile>
+
+        <Profile name="uwm_listItem" extends="baseReference" with="anchorTopStretchingX alternating">
+            <height value="32px"/>
+            <imageColor value="$preset_fs25_colorGrey"/>
+            <imageSelectedColor value="$preset_fs25_colorMainHighlight"/>
+            <alternateBackgroundColor value="$preset_fs25_colorGreyDark_50"/>
+        </Profile>
+
+        <Profile name="uwm_listSliderBox" extends="fs25_listSliderBox" with="anchorTopRight">
+            <position value="28px -40px"/>
+            <size value="6px 710px"/>
+        </Profile>
+
+        <Profile name="uwm_headerCell" extends="fs25_textDarkHighlight" with="anchorStretchingYLeft">
+            <textSize value="15px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textAlignment value="center"/>
+        </Profile>
+
+        <Profile name="uwm_headerCellLeft" extends="uwm_headerCell">
+            <textAlignment value="left"/>
+        </Profile>
+
+        <Profile name="uwm_rowCell" extends="fs25_textDarkHighlight" with="anchorStretchingYLeft">
+            <textSize value="16px"/>
+            <textBold value="false"/>
+            <textAlignment value="center"/>
+        </Profile>
+
+        <Profile name="uwm_rowCellLeft" extends="uwm_rowCell">
+            <textAlignment value="left"/>
+        </Profile>
+    </GUIProfiles>
+</GUI>

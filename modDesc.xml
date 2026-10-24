@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<modDesc descVersion="113">
+    <author>PropaineX</author>
+    <version>0.2.0.0</version>
+    <title>
+        <en>Utilities &amp; Waste Management</en>
+    </title>
+    <description>
+        <en><![CDATA[Farms trade electricity, slurry and manure with each other through invoices.
+
+Open the Utilities page in the ESC menu. The farm manager can send a bill (to sell) or an order (to buy) to another farm; that farm's manager accepts or declines it. Set the amount, or take everything the seller has in stock, and set your own price per 1,000 liters (the game's price is shown as a guide). Trade once, or every day or every week until either farm ends it.
+
+Electricity goes straight from the seller's power-producing productions into the buyer's productions the buyer picked, and is paid for as it arrives. Slurry and manure are paid for up front and collected by anyone on the buying farm: drive up to the seller's slurry pit, manure heap or silo and load as usual, and only what you paid for is offered. The liters come out of the seller's own stock. Buyers can reserve what they paid for, so the seller can't use it. Liters that are never collected are refunded when the invoice ends.
+
+Multiplayer: everything runs on the server and only farm managers can trade.]]></en>
+    </description>
+    <iconFilename>icon_UtilitiesWasteManagement.dds</iconFilename>
+    <multiplayer supported="true" />
+
+    <extraSourceFiles>
+        <sourceFile filename="scripts/UWMInvoice.lua" />
+        <sourceFile filename="scripts/UWMStock.lua" />
+        <sourceFile filename="scripts/UWMManager.lua" />
+        <sourceFile filename="scripts/UWMEvents.lua" />
+        <sourceFile filename="scripts/UWMPickup.lua" />
+        <sourceFile filename="scripts/gui/UWMWizard.lua" />
+        <sourceFile filename="scripts/gui/UWMFrame.lua" />
+        <sourceFile filename="scripts/UtilitiesWasteManagement.lua" />
+    </extraSourceFiles>
+
+    <l10n>
+        <!-- page -->
+        <text name="uwm_menuTitle"><en>Utilities &amp; Waste Management</en></text>
+        <text name="uwm_managerYes"><en>You are the farm manager: you can trade</en></text>
+        <text name="uwm_managerNo"><en>Only the farm manager can trade</en></text>
+        <text name="uwm_column_good"><en>Good</en></text>
+        <text name="uwm_column_farm"><en>Farm</en></text>
+        <text name="uwm_column_role"><en>You are</en></text>
+        <text name="uwm_column_amount"><en>Amount</en></text>
+        <text name="uwm_column_price"><en>Price</en></text>
+        <text name="uwm_column_repeat"><en>Repeats</en></text>
+        <text name="uwm_column_status"><en>Status</en></text>
+        <text name="uwm_section_incoming"><en>Waiting for your answer</en></text>
+        <text name="uwm_section_sent"><en>Sent by you</en></text>
+        <text name="uwm_section_active"><en>Active</en></text>
+        <text name="uwm_section_history"><en>History</en></text>
+        <text name="uwm_button_new"><en>New invoice</en></text>
+        <text name="uwm_button_accept"><en>Accept</en></text>
+        <text name="uwm_button_decline"><en>Decline</en></text>
+        <text name="uwm_button_cancel"><en>Cancel</en></text>
+        <text name="uwm_button_withdraw"><en>Withdraw</en></text>
+        <text name="uwm_button_end"><en>End and refund</en></text>
+        <text name="uwm_button_next"><en>Next</en></text>
+        <text name="uwm_role_buying"><en>Buying</en></text>
+        <text name="uwm_role_selling"><en>Selling</en></text>
+        <text name="uwm_amount_all"><en>All in stock</en></text>
+        <text name="uwm_pricePer1000"><en>%s / 1,000 l</en></text>
+        <text name="uwm_pricePer1000kWh"><en>%s / 1,000 kWh</en></text>
+        <text name="uwm_repeat_once"><en>One-off</en></text>
+        <text name="uwm_repeat_daily"><en>Every day</en></text>
+        <text name="uwm_repeat_weekly"><en>Every week</en></text>
+        <text name="uwm_state_pending"><en>Waiting</en></text>
+        <text name="uwm_state_done"><en>Done</en></text>
+        <text name="uwm_state_declined"><en>Declined</en></text>
+        <text name="uwm_state_cancelled"><en>Ended</en></text>
+        <text name="uwm_status_delivered"><en>%s delivered</en></text>
+        <text name="uwm_status_toCollect"><en>%s to collect</en></text>
+        <text name="uwm_status_reserved"><en>reserved</en></text>
+        <text name="uwm_status_refunded"><en>%s refunded</en></text>
+
+        <!-- goods -->
+        <text name="uwm_good_electricity"><en>Electricity</en></text>
+        <text name="uwm_good_slurry"><en>Slurry</en></text>
+        <text name="uwm_good_manure"><en>Manure</en></text>
+
+        <!-- finance page -->
+        <text name="uwm_finance_income"><en>Utility sales</en></text>
+        <text name="uwm_finance_expense"><en>Utility purchases</en></text>
+        <text name="finance_uwmIncome"><en>Utility sales</en></text>
+        <text name="finance_uwmExpense"><en>Utility purchases</en></text>
+
+        <!-- new invoice -->
+        <text name="uwm_wizard_title"><en>Utilities invoice</en></text>
+        <text name="uwm_wizard_side"><en>Do you want to sell or buy?</en></text>
+        <text name="uwm_wizard_sideSell"><en>Sell (send a bill)</en></text>
+        <text name="uwm_wizard_sideBuy"><en>Buy (send an order)</en></text>
+        <text name="uwm_wizard_noFarms"><en>There is no other farm to trade with.</en></text>
+        <text name="uwm_wizard_farmBuyer"><en>Which farm are you selling to?</en></text>
+        <text name="uwm_wizard_farmSeller"><en>Which farm are you buying from?</en></text>
+        <text name="uwm_wizard_good"><en>What is being traded?</en></text>
+        <text name="uwm_wizard_amount"><en>How much?</en></text>
+        <text name="uwm_wizard_amountFixed"><en>A set amount</en></text>
+        <text name="uwm_wizard_amountAll"><en>All of it (everything the seller has in stock)</en></text>
+        <text name="uwm_wizard_liters"><en>Amount in liters</en></text>
+        <text name="uwm_wizard_price"><en>Price per 1,000 liters</en></text>
+        <text name="uwm_wizard_marketHint"><en>The game's price: %s per 1,000 liters</en></text>
+        <text name="uwm_wizard_repeat"><en>Once, or as a standing contract?</en></text>
+        <text name="uwm_wizard_reserve"><en>Reserve the liters you pay for? The seller then can't use them before you collect them.</en></text>
+        <text name="uwm_wizard_reserveNo"><en>Don't reserve</en></text>
+        <text name="uwm_wizard_reserveYes"><en>Reserve</en></text>
+        <text name="uwm_wizard_targets"><en>Which productions get the electricity? Pick one or more; they are filled in the order picked.</en></text>
+        <text name="uwm_wizard_targetsDone"><en>Done (%d picked)</en></text>
+        <text name="uwm_summary_buyFrom"><en>Buy %s from %s</en></text>
+        <text name="uwm_summary_sellTo"><en>Sell %s to %s</en></text>
+        <text name="uwm_summary_amount"><en>%s, total %s</en></text>
+        <text name="uwm_summary_amountAll"><en>All in stock when paid</en></text>
+        <text name="uwm_summary_price"><en>%s per 1,000 liters</en></text>
+        <text name="uwm_summary_reserved"><en>Reserved for the buyer</en></text>
+        <text name="uwm_summary_targets"><en>Into %d production(s)</en></text>
+        <text name="uwm_confirm_sendBill"><en>Send this bill?</en></text>
+        <text name="uwm_confirm_sendOrder"><en>Send this order?</en></text>
+        <text name="uwm_confirm_accept"><en>Accept this order?</en></text>
+        <text name="uwm_confirm_acceptPay"><en>Accept and pay?</en></text>
+        <text name="uwm_confirm_decline"><en>Decline this invoice?</en></text>
+        <text name="uwm_confirm_withdraw"><en>Withdraw this invoice?</en></text>
+        <text name="uwm_confirm_end"><en>End this invoice? The buyer gets the money back for liters not yet collected.</en></text>
+        <text name="uwm_confirm_endContract"><en>End this electricity contract?</en></text>
+
+        <!-- answers to a request -->
+        <text name="uwm_result_billSent"><en>Bill sent.</en></text>
+        <text name="uwm_result_orderSent"><en>Order sent.</en></text>
+        <text name="uwm_result_accepted"><en>Invoice accepted.</en></text>
+        <text name="uwm_result_declined"><en>Invoice declined.</en></text>
+        <text name="uwm_result_cancelled"><en>Invoice ended.</en></text>
+        <text name="uwm_error_notServer"><en>The server is not ready.</en></text>
+        <text name="uwm_error_noFarm"><en>Join a farm to trade.</en></text>
+        <text name="uwm_error_notManager"><en>Only the farm manager can do that.</en></text>
+        <text name="uwm_error_unknownInvoice"><en>That invoice no longer exists.</en></text>
+        <text name="uwm_error_notYours"><en>That invoice is not for your farm.</en></text>
+        <text name="uwm_error_unknownAction"><en>Unknown request.</en></text>
+        <text name="uwm_error_badGood"><en>That good can't be traded.</en></text>
+        <text name="uwm_error_badFarm"><en>Pick another farm.</en></text>
+        <text name="uwm_error_badAmount"><en>Enter an amount above 0.</en></text>
+        <text name="uwm_error_badPrice"><en>Enter a price of 0 or more.</en></text>
+        <text name="uwm_error_badRepeat"><en>Pick one-off, every day or every week.</en></text>
+        <text name="uwm_error_notPending"><en>That invoice has already been answered.</en></text>
+        <text name="uwm_error_ownInvoice"><en>You can't accept your own invoice.</en></text>
+        <text name="uwm_error_ownInvoiceOnly"><en>Only the farm that sent it can withdraw it.</en></text>
+        <text name="uwm_error_finished"><en>That invoice is already finished.</en></text>
+        <text name="uwm_error_noTargets"><en>The buyer has no production that uses electricity.</en></text>
+        <text name="uwm_error_noStock"><en>The seller has none in stock</en></text>
+        <text name="uwm_error_noSpace"><en>The buyer's productions are full</en></text>
+        <text name="uwm_error_noMoney"><en>The buyer doesn't have enough money</en></text>
+
+        <!-- notifications: first %s = the other farm, second %s = the good -->
+        <text name="uwm_notify_newBill"><en>%s sent you a bill for %s.</en></text>
+        <text name="uwm_notify_newOrder"><en>%s sent you an order for %s.</en></text>
+        <text name="uwm_notify_accepted"><en>%s accepted your invoice for %s.</en></text>
+        <text name="uwm_notify_declined"><en>%s declined your invoice for %s.</en></text>
+        <text name="uwm_notify_withdrawn"><en>%s withdrew their invoice for %s.</en></text>
+        <text name="uwm_notify_ended"><en>%s ended the invoice for %s.</en></text>
+        <text name="uwm_notify_refund"><en>Refund from %s for %s not collected.</en></text>
+        <text name="uwm_notify_collected"><en>%s collected all the %s they paid for.</en></text>
+        <text name="uwm_notify_contractRun"><en>Contract with %s: %s paid for this period.</en></text>
+        <text name="uwm_notify_contractFailed"><en>Contract with %s: %s could not be traded this period.</en></text>
+    </l10n>
+</modDesc>
