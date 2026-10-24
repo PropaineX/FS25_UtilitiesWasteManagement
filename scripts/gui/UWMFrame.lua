@@ -129,6 +129,35 @@ function UWMFrame:initialize()
             self:onClickCancel()
         end
     }
+    -- Details sits on MENU_ACCEPT, except for invoices waiting for your answer (Accept is there)
+    self.detailsButtonInfo = {
+        inputAction = InputAction.MENU_ACCEPT,
+        text = getText("uwm_button_details"),
+        callback = function()
+            self:onClickDetails()
+        end
+    }
+    self.detailsIncomingButtonInfo = {
+        inputAction = InputAction.MENU_EXTRA_2,
+        text = getText("uwm_button_details"),
+        callback = function()
+            self:onClickDetails()
+        end
+    }
+    self.deleteButtonInfo = {
+        inputAction = InputAction.MENU_EXTRA_1,
+        text = getText("uwm_button_delete"),
+        callback = function()
+            self:onClickDelete()
+        end
+    }
+    self.clearHistoryButtonInfo = {
+        inputAction = InputAction.MENU_EXTRA_2,
+        text = getText("uwm_button_clearHistory"),
+        callback = function()
+            self:onClickClearHistory()
+        end
+    }
 
     self:updateButtons()
 end
@@ -165,7 +194,7 @@ function UWMFrame:refresh()
     local manager = UtilitiesWasteManagement.manager
     if manager ~= nil then
         for _, invoice in ipairs(manager:getInvoices()) do
-            if invoice.sellerFarmId == farmId or invoice.buyerFarmId == farmId then
+            if (invoice.sellerFarmId == farmId or invoice.buyerFarmId == farmId) and not invoice:getIsHiddenFor(farmId) then
                 local section
                 if invoice.state == STATE.PENDING then
                     section = invoice.creatorFarmId == farmId and UWMFrame.SECTION_SENT or UWMFrame.SECTION_INCOMING
@@ -207,26 +236,43 @@ function UWMFrame:refresh()
     self:updateButtons()
 end
 
+-- buttons per selection (everyone sees Details; only the farm manager gets the rest):
+--   waiting for your answer: Accept, Decline, Details      sent by you / active: Details, Withdraw / End
+--   history: Details, Delete, Clear history
 function UWMFrame:updateButtons()
     local buttons = {self.backButtonInfo}
     local farmId = UtilitiesWasteManagement.getLocalFarmId()
+    local isManager = UtilitiesWasteManagement.getLocalIsManager()
+    local invoice = self.selectedInvoice
+    local isIncoming = invoice ~= nil and invoice.state == STATE.PENDING and invoice.creatorFarmId ~= farmId
 
-    if UtilitiesWasteManagement.getLocalIsManager() then
+    if isManager then
         table.insert(buttons, self.newButtonInfo)
+    end
 
-        local invoice = self.selectedInvoice
-        if invoice ~= nil then
-            if invoice.state == STATE.PENDING and invoice.creatorFarmId ~= farmId then
-                table.insert(buttons, self.acceptButtonInfo)
-                table.insert(buttons, self.declineButtonInfo)
-            elseif invoice.state == STATE.PENDING then
+    if invoice ~= nil then
+        if isIncoming and isManager then
+            table.insert(buttons, self.acceptButtonInfo)
+            table.insert(buttons, self.declineButtonInfo)
+            table.insert(buttons, self.detailsIncomingButtonInfo)
+        else
+            table.insert(buttons, self.detailsButtonInfo)
+        end
+
+        if isManager and not isIncoming then
+            if invoice.state == STATE.PENDING then
                 self.cancelButtonInfo.text = UtilitiesWasteManagement.getText("uwm_button_withdraw")
                 table.insert(buttons, self.cancelButtonInfo)
             elseif invoice.state == STATE.ACTIVE then
                 self.cancelButtonInfo.text = UtilitiesWasteManagement.getText("uwm_button_end")
                 table.insert(buttons, self.cancelButtonInfo)
+            elseif invoice:getIsFinished() then
+                table.insert(buttons, self.deleteButtonInfo)
+                table.insert(buttons, self.clearHistoryButtonInfo)
             end
         end
+    elseif isManager and #self.sections[UWMFrame.SECTION_HISTORY] > 0 then
+        table.insert(buttons, self.clearHistoryButtonInfo)
     end
 
     self.menuButtons = buttons
@@ -345,6 +391,97 @@ function UWMFrame:onClickDecline()
             end
         end, self, UtilitiesWasteManagement.getText("uwm_confirm_decline"))
     end
+end
+
+function UWMFrame:onClickDetails()
+    if self.selectedInvoice ~= nil then
+        InfoDialog.show(UWMFrame.getDetailsText(self.selectedInvoice, UtilitiesWasteManagement.getLocalFarmId()))
+    end
+end
+
+function UWMFrame:onClickDelete()
+    local invoice = self.selectedInvoice
+    if invoice ~= nil then
+        YesNoDialog.show(function(_, yes)
+            if yes then
+                UWMRequestEvent.sendRequest(UWMManager.ACTION.DELETE, {invoiceId = invoice.id})
+            end
+        end, self, UtilitiesWasteManagement.getText("uwm_confirm_delete"))
+    end
+end
+
+function UWMFrame:onClickClearHistory()
+    local count = #self.sections[UWMFrame.SECTION_HISTORY]
+    YesNoDialog.show(function(_, yes)
+        if yes then
+            UWMRequestEvent.sendRequest(UWMManager.ACTION.CLEAR_HISTORY, {})
+        end
+    end, self, string.format(UtilitiesWasteManagement.getText("uwm_confirm_clearHistory"), count))
+end
+
+-- everything about one invoice, for the Details box
+function UWMFrame.getDetailsText(invoice, farmId)
+    local UWM = UtilitiesWasteManagement
+    local getText = UWM.getText
+    local ft = invoice.fillTypeIndex
+    local isElectricity = invoice:getIsElectricity()
+    local lines = {}
+    local function add(key, ...)
+        table.insert(lines, string.format(getText(key), ...))
+    end
+
+    add("uwm_details_title", invoice.id, UWM.getGoodName(ft))
+    add("uwm_details_seller", UWMManager.getFarmName(invoice.sellerFarmId))
+    add("uwm_details_buyer", UWMManager.getFarmName(invoice.buyerFarmId))
+    table.insert(lines, "")
+
+    local ordered = invoice.amountMode == UWMInvoice.AMOUNT.ALL and getText("uwm_amount_all") or UWM.formatAmount(ft, invoice.liters)
+    add("uwm_details_ordered", ordered)
+    local priceKey = isElectricity and "uwm_pricePer1000kWh" or "uwm_pricePer1000"
+    add("uwm_details_price", string.format(getText(priceKey), UWM.formatMoney(invoice.pricePer1000)))
+    add("uwm_details_repeats", UWMFrame.getRepeatText(invoice))
+    if invoice.reserve then
+        table.insert(lines, getText("uwm_summary_reserved"))
+    end
+    table.insert(lines, "")
+
+    if isElectricity then
+        add("uwm_details_delivered", UWM.formatAmount(ft, invoice.totalLiters))
+    else
+        add("uwm_details_paidFor", UWM.formatAmount(ft, invoice.totalLiters + invoice.owedLiters + invoice.refundedLiters))
+        add("uwm_details_collected", UWM.formatAmount(ft, invoice.totalLiters))
+        if invoice.owedLiters > 0.5 then
+            add("uwm_details_toCollect", UWM.formatAmount(ft, invoice.owedLiters))
+        end
+        if invoice.refundedLiters > 0.5 then
+            add("uwm_details_refundedLiters", UWM.formatAmount(ft, invoice.refundedLiters))
+        end
+    end
+    add("uwm_details_buyerPaid", UWM.formatMoney(invoice.totalMoney + invoice.totalRefund))
+    add("uwm_details_refunded", UWM.formatMoney(invoice.totalRefund))
+    add("uwm_details_sellerGot", UWM.formatMoney(invoice.totalMoney))
+    if isElectricity and invoice.amountMode == UWMInvoice.AMOUNT.FIXED and invoice.state ~= STATE.PENDING
+        and invoice.totalLiters < invoice.liters - 0.5 then
+        table.insert(lines, getText("uwm_details_electricityShort"))
+    end
+    table.insert(lines, "")
+
+    add("uwm_details_status", UWMFrame.getStatusText(invoice))
+    add("uwm_details_sentDay", invoice.createdDay)
+    if invoice.finishedDay > 0 then
+        add("uwm_details_finishedDay", invoice.finishedDay)
+    end
+
+    return table.concat(lines, "\n")
+end
+
+function UWMFrame.getRepeatText(invoice)
+    if invoice.repeatDays == UWMInvoice.REPEAT_DAILY then
+        return UtilitiesWasteManagement.getText("uwm_repeat_daily")
+    elseif invoice.repeatDays == UWMInvoice.REPEAT_WEEKLY then
+        return UtilitiesWasteManagement.getText("uwm_repeat_weekly")
+    end
+    return UtilitiesWasteManagement.getText("uwm_repeat_once")
 end
 
 function UWMFrame:onClickCancel()

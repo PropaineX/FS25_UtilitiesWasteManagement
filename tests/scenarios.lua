@@ -211,5 +211,71 @@ check("done: buyer no longer allowed at the pit", not pitStation:getIsFillAllowe
 local stranger = newTanker(3, 99999)
 check("a farm with no invoice gets nothing", pitStation:addFillLevelToFillableObject(stranger, 1, FillType.LIQUIDMANURE, 1000) == 0)
 
+local function contains(text, part) return text:find(part, 1, true) ~= nil end
+
+-- 12. the first MP case: 10,000 kWh ordered, the seller only had 4,123 -> details + receipt show it
+reset()
+notificationDetails = {}
+add(newPlaceable(1, "spec_productionPoint", {productionPoint = {storage = newStorage({[FillType.ELECTRICCHARGE] = 4123}), outputFillTypeIds = {[FillType.ELECTRICCHARGE] = true}, inputFillTypeIds = {}}}, "bga1"))
+bakery = add(newPlaceable(2, "spec_productionPoint", {productionPoint = {storage = newStorage({[FillType.ELECTRICCHARGE] = 0}), inputFillTypeIds = {[FillType.ELECTRICCHARGE] = true}, outputFillTypeIds = {}}}, "Malzfabrik"))
+order(10, 1, 2, FillType.ELECTRICCHARGE, UWMInvoice.AMOUNT.FIXED, 10000, 350)
+inv = last()
+M:handleRequest(A.ACCEPT, 20, {invoiceId = inv.id, targets = {bakery.uid}})
+check("short electricity: 4123 delivered, 1443.05 paid, done", near(inv.totalLiters, 4123) and near(inv.totalMoney, 1443.05) and inv.state == UWMInvoice.STATE.DONE)
+local details = UWMFrame.getDetailsText(inv, 2)
+check("details: ordered 10000, delivered 4123", contains(details, "Ordered: 10000") and contains(details, "Delivered: 4123"), details)
+check("details: buyer paid / seller received 1443.05, refunded 0", contains(details, "Buyer paid: 1443.05") and contains(details, "Seller received: 1443.05")
+    and contains(details, "Refunded to the buyer: 0"), details)
+check("details: says the seller was short", contains(details, "only what was delivered is paid for"), details)
+check("details: price per 1,000 kWh", contains(details, "350 / 1,000 kWh"), details)
+local receipts = 0
+for i, key in ipairs(notifications) do
+    if key:find("uwm_notify_receipt", 1, true) and contains(notificationDetails[i], "4123") and contains(notificationDetails[i], "1443.05") then
+        receipts = receipts + 1
+    end
+end
+check("both farms got the receipt numbers", receipts == 2, table.concat(notificationDetails, " | "))
+
+-- 13. slurry: paid 10000, collected 4000, ended -> 6000 refunded, all on the details
+reset()
+barn = add(newPlaceable(1, "spec_husbandry", {storage = newStorage({[FillType.LIQUIDMANURE] = 50000})}, "cowBarn"))
+pitStation = newStation(barn, barn.spec_husbandry.storage)
+order(20, 1, 2, FillType.LIQUIDMANURE, UWMInvoice.AMOUNT.FIXED, 10000, 33)
+inv = last(); M:handleRequest(A.ACCEPT, 10, {invoiceId = inv.id})
+pitStation:addFillLevelToFillableObject(newTanker(2, 4000), 1, FillType.LIQUIDMANURE, 9999, nil, ToolType.TRIGGER)
+M:handleRequest(A.CANCEL, 20, {invoiceId = inv.id})
+details = UWMFrame.getDetailsText(inv, 1)
+check("slurry details: paid for 10000, collected 4000, refunded 6000 l", contains(details, "Paid for: 10000") and contains(details, "Collected: 4000")
+    and contains(details, "Not collected, refunded: 6000"), details)
+check("slurry details: buyer paid 330, refunded 198, seller got 132", contains(details, "Buyer paid: 330") and contains(details, "Refunded to the buyer: 198")
+    and contains(details, "Seller received: 132"), details)
+check("finished day recorded", inv.finishedDay == 1 and contains(details, "Finished on day 1"), details)
+
+-- 14. deleting finished invoices: each farm only clears its own list
+local finishedId = inv.id
+ok, key = M:handleRequest(A.DELETE, 10, {invoiceId = finishedId})
+check("seller deletes: hidden for the seller only", ok and inv.hiddenBySeller and not inv.hiddenByBuyer and M:getInvoice(finishedId) ~= nil, key)
+ok, key = M:handleRequest(A.DELETE, 20, {invoiceId = finishedId})
+check("buyer deletes too: invoice gone", ok and M:getInvoice(finishedId) == nil, key)
+order(20, 1, 2, FillType.LIQUIDMANURE, UWMInvoice.AMOUNT.FIXED, 100, 1)
+local active = last(); M:handleRequest(A.ACCEPT, 10, {invoiceId = active.id})
+ok, key = M:handleRequest(A.DELETE, 20, {invoiceId = active.id})
+check("an active invoice can't be deleted", not ok and key == "uwm_error_notFinished", key)
+ok, key = M:handleRequest(A.DELETE, 21, {invoiceId = active.id})
+check("only the farm manager deletes", not ok and key == "uwm_error_notManager", key)
+order(20, 1, 2, FillType.MANURE, UWMInvoice.AMOUNT.FIXED, 5, 1); M:handleRequest(A.DECLINE, 10, {invoiceId = last().id})
+order(20, 1, 2, FillType.MANURE, UWMInvoice.AMOUNT.FIXED, 6, 1); M:handleRequest(A.CANCEL, 20, {invoiceId = last().id})
+ok = M:handleRequest(A.CLEAR_HISTORY, 20, {})
+local visible, kept = 0, 0
+for _, invoice in ipairs(M.invoices) do
+    if invoice:getIsFinished() and not invoice:getIsHiddenFor(2) then visible = visible + 1 end
+    if invoice:getIsFinished() and not invoice:getIsHiddenFor(1) then kept = kept + 1 end
+end
+check("buyer clears history: none left for him, seller still sees 2", ok and visible == 0 and kept == 2 and active.state == UWMInvoice.STATE.ACTIVE)
+stream = {}
+M:writeStream(0)
+copy = UWMManager.new(false); copy:readStream(0)
+check("hidden flags and refund liters travel to clients", copy.invoices[#copy.invoices].hiddenByBuyer and #stream == 0)
+
 print(string.format("%d passed, %d failed", passed, failed))
 return failed

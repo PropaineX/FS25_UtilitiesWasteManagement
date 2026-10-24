@@ -175,8 +175,10 @@ function UWMNotifyEvent.emptyNew()
     return Event.new(UWMNotifyEvent_mt)
 end
 
-function UWMNotifyEvent.new(farmId, key, farmName, fillTypeIndex)
+-- detail: extra text for the message (receipt numbers), "" for none
+function UWMNotifyEvent.new(farmId, key, farmName, fillTypeIndex, detail)
     local self = UWMNotifyEvent.emptyNew()
+    self.detail = detail or ""
     self.farmId = farmId
     self.key = key
     self.farmName = farmName or ""
@@ -188,6 +190,7 @@ function UWMNotifyEvent:writeStream(streamId, connection)
     streamWriteUInt8(streamId, self.farmId)
     streamWriteString(streamId, self.key)
     streamWriteString(streamId, self.farmName)
+    streamWriteString(streamId, self.detail)
     streamWriteUInt16(streamId, self.fillTypeIndex)
 end
 
@@ -195,20 +198,21 @@ function UWMNotifyEvent:readStream(streamId, connection)
     self.farmId = streamReadUInt8(streamId)
     self.key = streamReadString(streamId)
     self.farmName = streamReadString(streamId)
+    self.detail = streamReadString(streamId)
     self.fillTypeIndex = streamReadUInt16(streamId)
     self:run(connection)
 end
 
 function UWMNotifyEvent:run(connection)
-    UtilitiesWasteManagement.showNotification(self.farmId, self.key, self.farmName, self.fillTypeIndex)
+    UtilitiesWasteManagement.showNotification(self.farmId, self.key, self.farmName, self.fillTypeIndex, self.detail)
 end
 
-function UWMNotifyEvent.sendEvent(farmId, key, farmName, fillTypeIndex)
+function UWMNotifyEvent.sendEvent(farmId, key, farmName, fillTypeIndex, detail)
     if g_server ~= nil then
-        g_server:broadcastEvent(UWMNotifyEvent.new(farmId, key, farmName, fillTypeIndex), false)
+        g_server:broadcastEvent(UWMNotifyEvent.new(farmId, key, farmName, fillTypeIndex, detail), false)
         -- a host / singleplayer player gets no broadcast of their own
         if g_currentMission:getIsClient() then
-            UtilitiesWasteManagement.showNotification(farmId, key, farmName, fillTypeIndex)
+            UtilitiesWasteManagement.showNotification(farmId, key, farmName, fillTypeIndex, detail)
         end
     end
 end

@@ -46,6 +46,10 @@ function UWMInvoice.new()
     self.totalLiters = 0        -- delivered or collected so far
     self.totalMoney = 0         -- paid by the buyer so far, refunds taken off
     self.totalRefund = 0
+    self.refundedLiters = 0     -- liters paid for, never collected, money given back
+    self.finishedDay = 0
+    self.hiddenBySeller = false -- a farm deleted it from its own history (removed once both have)
+    self.hiddenByBuyer = false
     self.statusKey = ""         -- l10n key of the last problem, "" = none
 
     return self
@@ -69,6 +73,10 @@ function UWMInvoice:getOtherFarmId(farmId)
         return self.buyerFarmId
     end
     return self.sellerFarmId
+end
+
+function UWMInvoice:getIsHiddenFor(farmId)
+    return (farmId == self.sellerFarmId and self.hiddenBySeller) or (farmId == self.buyerFarmId and self.hiddenByBuyer)
 end
 
 function UWMInvoice:getPrice(liters)
@@ -101,6 +109,10 @@ function UWMInvoice:writeStream(streamId)
     streamWriteFloat32(streamId, self.totalLiters)
     streamWriteFloat32(streamId, self.totalMoney)
     streamWriteFloat32(streamId, self.totalRefund)
+    streamWriteFloat32(streamId, self.refundedLiters)
+    streamWriteInt32(streamId, self.finishedDay)
+    streamWriteBool(streamId, self.hiddenBySeller)
+    streamWriteBool(streamId, self.hiddenByBuyer)
     streamWriteString(streamId, self.statusKey)
 end
 
@@ -123,6 +135,10 @@ function UWMInvoice:readStream(streamId)
     self.totalLiters = streamReadFloat32(streamId)
     self.totalMoney = streamReadFloat32(streamId)
     self.totalRefund = streamReadFloat32(streamId)
+    self.refundedLiters = streamReadFloat32(streamId)
+    self.finishedDay = streamReadInt32(streamId)
+    self.hiddenBySeller = streamReadBool(streamId)
+    self.hiddenByBuyer = streamReadBool(streamId)
     self.statusKey = streamReadString(streamId)
 end
 
@@ -162,6 +178,10 @@ function UWMInvoice:saveToXMLFile(xmlFile, key)
     xmlFile:setFloat(key .. "#totalLiters", self.totalLiters)
     xmlFile:setFloat(key .. "#totalMoney", self.totalMoney)
     xmlFile:setFloat(key .. "#totalRefund", self.totalRefund)
+    xmlFile:setFloat(key .. "#refundedLiters", self.refundedLiters)
+    xmlFile:setInt(key .. "#finishedDay", self.finishedDay)
+    xmlFile:setBool(key .. "#hiddenBySeller", self.hiddenBySeller)
+    xmlFile:setBool(key .. "#hiddenByBuyer", self.hiddenByBuyer)
     xmlFile:setString(key .. "#statusKey", self.statusKey)
 
     for i, uniqueId in ipairs(self.targets) do
@@ -192,6 +212,12 @@ function UWMInvoice:loadFromXMLFile(xmlFile, key)
     self.totalLiters = xmlFile:getFloat(key .. "#totalLiters", 0)
     self.totalMoney = xmlFile:getFloat(key .. "#totalMoney", 0)
     self.totalRefund = xmlFile:getFloat(key .. "#totalRefund", 0)
+    -- older saves (0.1/0.2) have no refundedLiters: work it out from the money
+    local defaultRefundLiters = self.pricePer1000 > 0 and self.totalRefund / self.pricePer1000 * 1000 or 0
+    self.refundedLiters = xmlFile:getFloat(key .. "#refundedLiters", defaultRefundLiters)
+    self.finishedDay = xmlFile:getInt(key .. "#finishedDay", 0)
+    self.hiddenBySeller = xmlFile:getBool(key .. "#hiddenBySeller", false)
+    self.hiddenByBuyer = xmlFile:getBool(key .. "#hiddenByBuyer", false)
     self.statusKey = xmlFile:getString(key .. "#statusKey", "")
 
     self.targets = {}

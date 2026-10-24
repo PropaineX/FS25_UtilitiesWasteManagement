@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no" ?>
 <modDesc descVersion="113">
     <author>PropaineX</author>
-    <version>0.2.0.0</version>
+    <version>0.3.0.0</version>
     <title>
         <en>Utilities &amp; Waste Management</en>
     </title>
@@ -51,6 +51,9 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_button_withdraw"><en>Withdraw</en></text>
         <text name="uwm_button_end"><en>End and refund</en></text>
         <text name="uwm_button_next"><en>Next</en></text>
+        <text name="uwm_button_details"><en>Details</en></text>
+        <text name="uwm_button_delete"><en>Delete</en></text>
+        <text name="uwm_button_clearHistory"><en>Clear history</en></text>
         <text name="uwm_role_buying"><en>Buying</en></text>
         <text name="uwm_role_selling"><en>Selling</en></text>
         <text name="uwm_amount_all"><en>All in stock</en></text>
@@ -92,8 +95,11 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_wizard_amountFixed"><en>A set amount</en></text>
         <text name="uwm_wizard_amountAll"><en>All of it (everything the seller has in stock)</en></text>
         <text name="uwm_wizard_liters"><en>Amount in liters</en></text>
+        <text name="uwm_wizard_litersKWh"><en>Amount in kWh</en></text>
         <text name="uwm_wizard_price"><en>Price per 1,000 liters</en></text>
+        <text name="uwm_wizard_priceKWh"><en>Price per 1,000 kWh</en></text>
         <text name="uwm_wizard_marketHint"><en>The game's price: %s per 1,000 liters</en></text>
+        <text name="uwm_wizard_marketHintKWh"><en>The game's price: %s per 1,000 kWh</en></text>
         <text name="uwm_wizard_repeat"><en>Once, or as a standing contract?</en></text>
         <text name="uwm_wizard_reserve"><en>Reserve the liters you pay for? The seller then can't use them before you collect them.</en></text>
         <text name="uwm_wizard_reserveNo"><en>Don't reserve</en></text>
@@ -105,6 +111,7 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_summary_amount"><en>%s, total %s</en></text>
         <text name="uwm_summary_amountAll"><en>All in stock when paid</en></text>
         <text name="uwm_summary_price"><en>%s per 1,000 liters</en></text>
+        <text name="uwm_summary_priceKWh"><en>%s per 1,000 kWh</en></text>
         <text name="uwm_summary_reserved"><en>Reserved for the buyer</en></text>
         <text name="uwm_summary_targets"><en>Into %d production(s)</en></text>
         <text name="uwm_confirm_sendBill"><en>Send this bill?</en></text>
@@ -115,6 +122,8 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_confirm_withdraw"><en>Withdraw this invoice?</en></text>
         <text name="uwm_confirm_end"><en>End this invoice? The buyer gets the money back for liters not yet collected.</en></text>
         <text name="uwm_confirm_endContract"><en>End this electricity contract?</en></text>
+        <text name="uwm_confirm_delete"><en>Delete this invoice from your history? The other farm keeps its copy until it deletes it too.</en></text>
+        <text name="uwm_confirm_clearHistory"><en>Delete all %d finished invoices from your history?</en></text>
 
         <!-- answers to a request -->
         <text name="uwm_result_billSent"><en>Bill sent.</en></text>
@@ -122,6 +131,8 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_result_accepted"><en>Invoice accepted.</en></text>
         <text name="uwm_result_declined"><en>Invoice declined.</en></text>
         <text name="uwm_result_cancelled"><en>Invoice ended.</en></text>
+        <text name="uwm_result_deleted"><en>Invoice deleted.</en></text>
+        <text name="uwm_result_historyCleared"><en>History cleared.</en></text>
         <text name="uwm_error_notServer"><en>The server is not ready.</en></text>
         <text name="uwm_error_noFarm"><en>Join a farm to trade.</en></text>
         <text name="uwm_error_notManager"><en>Only the farm manager can do that.</en></text>
@@ -137,6 +148,7 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_error_ownInvoice"><en>You can't accept your own invoice.</en></text>
         <text name="uwm_error_ownInvoiceOnly"><en>Only the farm that sent it can withdraw it.</en></text>
         <text name="uwm_error_finished"><en>That invoice is already finished.</en></text>
+        <text name="uwm_error_notFinished"><en>Only finished invoices can be deleted.</en></text>
         <text name="uwm_error_noTargets"><en>The buyer has no production that uses electricity.</en></text>
         <text name="uwm_error_noStock"><en>The seller has none in stock</en></text>
         <text name="uwm_error_noSpace"><en>The buyer's productions are full</en></text>
@@ -149,9 +161,32 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_notify_declined"><en>%s declined your invoice for %s.</en></text>
         <text name="uwm_notify_withdrawn"><en>%s withdrew their invoice for %s.</en></text>
         <text name="uwm_notify_ended"><en>%s ended the invoice for %s.</en></text>
-        <text name="uwm_notify_refund"><en>Refund from %s for %s not collected.</en></text>
         <text name="uwm_notify_collected"><en>%s collected all the %s they paid for.</en></text>
-        <text name="uwm_notify_contractRun"><en>Contract with %s: %s paid for this period.</en></text>
+        <text name="uwm_notify_contractRun"><en>Contract with %s, %s: %s.</en></text>
+        <text name="uwm_notify_receipt"><en>Invoice with %s for %s finished: %s.</en></text>
         <text name="uwm_notify_contractFailed"><en>Contract with %s: %s could not be traded this period.</en></text>
+
+        <!-- receipt numbers (third %s of the notifications) and the Details box -->
+        <text name="uwm_receipt_line"><en>%s delivered or collected, %s paid, %s refunded</en></text>
+        <text name="uwm_receipt_periodDelivered"><en>%s delivered for %s</en></text>
+        <text name="uwm_receipt_periodPaid"><en>%s paid for (%s)</en></text>
+        <text name="uwm_details_title"><en>Invoice #%d: %s</en></text>
+        <text name="uwm_details_seller"><en>Seller: %s</en></text>
+        <text name="uwm_details_buyer"><en>Buyer: %s</en></text>
+        <text name="uwm_details_ordered"><en>Ordered: %s</en></text>
+        <text name="uwm_details_price"><en>Price: %s</en></text>
+        <text name="uwm_details_repeats"><en>Repeats: %s</en></text>
+        <text name="uwm_details_delivered"><en>Delivered: %s</en></text>
+        <text name="uwm_details_paidFor"><en>Paid for: %s</en></text>
+        <text name="uwm_details_collected"><en>Collected: %s</en></text>
+        <text name="uwm_details_toCollect"><en>Still to collect: %s</en></text>
+        <text name="uwm_details_refundedLiters"><en>Not collected, refunded: %s</en></text>
+        <text name="uwm_details_buyerPaid"><en>Buyer paid: %s</en></text>
+        <text name="uwm_details_refunded"><en>Refunded to the buyer: %s</en></text>
+        <text name="uwm_details_sellerGot"><en>Seller received: %s</en></text>
+        <text name="uwm_details_electricityShort"><en>The seller had less electricity than ordered: only what was delivered is paid for.</en></text>
+        <text name="uwm_details_status"><en>Status: %s</en></text>
+        <text name="uwm_details_sentDay"><en>Sent on day %d</en></text>
+        <text name="uwm_details_finishedDay"><en>Finished on day %d</en></text>
     </l10n>
 </modDesc>

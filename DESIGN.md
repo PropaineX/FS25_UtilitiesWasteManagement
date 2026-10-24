@@ -58,6 +58,53 @@ there is no depot mode.)
 The fill point only offers a farm what it has paid for and not yet collected (the R list shows those goods only),
 and loading stops when the paid liters are collected or the seller's stock runs out.
 
+**Community depot (user's rules, 2026-10-23):**
+- It's the server's "community government central" for waste management and electricity. **Any farm can collect
+  any paid invoice at the depot**, whoever placed it and whoever the seller is; the R list shows each buyer their own
+  paid goods from all their sellers.
+- **Price $268,000, upkeep 0.1 % = $268 per in-game day** (user, 2026-10-24: "use the game's 0.1 %", the base-game
+  silo rate - Farma 400 $120/day on $117,000; earlier tries 1 % and 0.17 % dropped). On the user's server one
+  month is one day (every sleep = a new day = a new month), so daily and monthly are the same. The upkeep is split
+  equally between the owner and every farm that agreed to be a member. Placeable XML: dailyUpkeep 268.
+- **One farm owns it and pays the bills** (price + upkeep). Sharing the cost is up to the owner: free, or a
+  **recurring cost-share invoice** that splits the cost between the farms (e.g. three ways) and bills them every month.
+- **Only one depot on the map.** A setting, default ON; when it's off, more can be placed. It's a **server
+  setting: only the server admin can switch it** (user, 2026-10-23).
+
+**Depot membership (user's flow, 2026-10-23):**
+1. One farm builds the depot. The depot then **sends a membership invoice to every other farm on the map**, and to
+   **every farm created later**: "Do you want to use this depot?", showing what it will cost. Yes / No.
+2. **No** = that farm can't use the depot, until it **files a request**; the depot then sends it a new membership
+   invoice.
+3. **Upkeep is shared equally and taken automatically, like any building's upkeep - no invoice** (user's rule,
+   2026-10-23). Everyone participating (the owner and every member) pays the same share. Claude's choice of timing:
+   the game charges the owner the depot's normal upkeep; each in-game day (also when sleeping skips to the next
+   day) every member pays the owner his equal share of that day's upkeep, so in the end all pay the same.
+4. **Two missed monthly payments in a row = suspended**: can't use the depot until the late payments are paid. The
+   depot sends an invoice for what is owed. With automatic payment, "missed" = the member didn't have the money
+   when his share was due; the unpaid shares add up as arrears. A month with unpaid arrears at its end counts as
+   missed; two such months in a row suspend the farm, and paying the arrears invoice lifts it.
+
+5. **"Using the depot" = buying and selling through it** (user, 2026-10-23). A farm that said No or is suspended
+   can't buy or sell at the depot: its paid manure/slurry can't be collected there, and its goods can't be picked up
+   there by others. **The mod blocks only two things for such a farm: the invoices and the depot** (user,
+   2026-10-23): it can't send or accept invoices of this mod (electricity included), so it also gets no invoice
+   pickups at a seller's barn. Nothing else in the game is blocked. Private deals between farms are their own
+   business: how the product moves and how money changes hands is up to them, not the mod.
+   Invoices already paid before a farm was suspended can still be finished (collected, or ended with a refund);
+   only new ones are blocked (confirmed by the user).
+6. **The depot works like a sell point** (user: "I can't sell to the farmer's market if the farmer's market isn't
+   built"): the whole invoicing and selling can't happen until the depot is built. So the next build is the depot
+   itself, with the invoice lock and the barn-pickup removal in the same build.
+   **The invoices are tied to the depot** (user, 2026-10-23): **no depot on the map = no invoice system at all**
+   ("without the depot you're doing things old school"). **No pick-up or delivery at individual farms**: the
+   collecting at the seller's own barn / pit / heap (built in 0.2.0.0) is to be REMOVED; paid manure and slurry
+   are collected only at the depot. **Electricity stays as it is** (user: "we can't physically touch that"):
+   delivered straight from the seller's productions into the buyer's chosen productions, no depot pickup. It still
+   needs a depot on the map and depot membership, like every invoice.
+
+Still to settle: the depot's look (preview first).
+
 ### Buyer's options on a manure / slurry invoice (user's rules, 2026-10-23)
 
 - **Amount:** either a set number of liters, or **"I'll take all of it"** = everything the seller has in stock.

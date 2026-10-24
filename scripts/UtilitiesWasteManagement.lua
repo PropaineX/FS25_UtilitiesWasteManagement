@@ -153,11 +153,11 @@ addModEventListener(UWM)
 -- Messages to the player
 ----------------------------------------------------------------------------------------------------------------
 
-function UWM.showNotification(farmId, key, farmName, fillTypeIndex)
+function UWM.showNotification(farmId, key, farmName, fillTypeIndex, detail)
     if g_currentMission == nil or not g_currentMission:getIsClient() or farmId ~= UWM.getLocalFarmId() then
         return
     end
-    local text = string.format(UWM.getText(key), farmName, UWM.getGoodName(fillTypeIndex))
+    local text = string.format(UWM.getText(key), farmName, UWM.getGoodName(fillTypeIndex), detail or "")
     local notificationType = FSBaseMission.INGAME_NOTIFICATION_INFO
     if key == "uwm_notify_contractFailed" then
         notificationType = FSBaseMission.INGAME_NOTIFICATION_CRITICAL

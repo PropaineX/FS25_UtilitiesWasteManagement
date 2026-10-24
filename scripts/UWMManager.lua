@@ -9,7 +9,9 @@ UWMManager.ACTION = {
     CREATE = 1,
     ACCEPT = 2,
     DECLINE = 3,
-    CANCEL = 4      -- pending: the sender takes it back; active: either farm ends it, unpaid-out liters refunded
+    CANCEL = 4,     -- pending: the sender takes it back; active: either farm ends it, unpaid-out liters refunded
+    DELETE = 5,     -- a finished invoice leaves this farm's history (gone for good once both farms deleted it)
+    CLEAR_HISTORY = 6 -- DELETE for every finished invoice of this farm
 }
 
 UWMManager.MAX_HISTORY = 100
@@ -71,6 +73,16 @@ function UWMManager:addInvoice(invoice)
     self.nextId = math.max(self.nextId, invoice.id + 1)
 end
 
+function UWMManager:removeInvoice(invoice)
+    for i, other in ipairs(self.invoices) do
+        if other == invoice then
+            table.remove(self.invoices, i)
+            break
+        end
+    end
+    self.invoiceById[invoice.id] = nil
+end
+
 -- liters of a seller's stock held for buyers who ticked Reserve
 function UWMManager:getReservedLiters(farmId, fillTypeIndex, exceptInvoice)
     local reserved = 0
@@ -120,12 +132,32 @@ function UWMManager:transferMoney(invoice, amount)
     invoice.totalMoney = invoice.totalMoney + amount
 end
 
-function UWMManager:notify(farmId, key, invoice)
+-- detail: optional text for a third %s (the numbers of a receipt)
+function UWMManager:notify(farmId, key, invoice, detail)
     if farmId == nil or farmId == FarmManager.SPECTATOR_FARM_ID then
         return
     end
     local otherName = invoice ~= nil and UWMManager.getFarmName(invoice:getOtherFarmId(farmId)) or ""
-    UWMNotifyEvent.sendEvent(farmId, key, otherName, invoice ~= nil and invoice.fillTypeIndex or FillType.UNKNOWN)
+    UWMNotifyEvent.sendEvent(farmId, key, otherName, invoice ~= nil and invoice.fillTypeIndex or FillType.UNKNOWN, detail)
+end
+
+-- "4,123 kWh delivered, $1,443 paid, $0 refunded" for the whole invoice so far
+function UWMManager.getReceiptLine(invoice)
+    local UWM = UtilitiesWasteManagement
+    return string.format(UWM.getText("uwm_receipt_line"), UWM.formatAmount(invoice.fillTypeIndex, invoice.totalLiters),
+        UWM.formatMoney(invoice.totalMoney), UWM.formatMoney(invoice.totalRefund))
+end
+
+-- both farms get the numbers when an invoice is over
+function UWMManager:sendReceipt(invoice)
+    local line = UWMManager.getReceiptLine(invoice)
+    self:notify(invoice.sellerFarmId, "uwm_notify_receipt", invoice, line)
+    self:notify(invoice.buyerFarmId, "uwm_notify_receipt", invoice, line)
+end
+
+function UWMManager:finish(invoice, state)
+    invoice.state = state
+    invoice.finishedDay = g_currentMission.environment.currentMonotonicDay
 end
 
 ----------------------------------------------------------------------------------------------------------------
@@ -170,6 +202,8 @@ function UWMManager:runRequest(action, userId, data)
 
     if action == UWMManager.ACTION.CREATE then
         return self:createInvoice(farmId, data.invoice, data.targets)
+    elseif action == UWMManager.ACTION.CLEAR_HISTORY then
+        return self:clearHistory(farmId)
     end
 
     local invoice = self:getInvoice(data.invoiceId or 0)
@@ -186,6 +220,8 @@ function UWMManager:runRequest(action, userId, data)
         return self:declineInvoice(farmId, invoice)
     elseif action == UWMManager.ACTION.CANCEL then
         return self:cancelInvoice(farmId, invoice)
+    elseif action == UWMManager.ACTION.DELETE then
+        return self:deleteInvoice(farmId, invoice)
     end
 
     return false, "uwm_error_unknownAction"
@@ -269,9 +305,12 @@ function UWMManager:acceptInvoice(farmId, invoice, reserve, targets)
         invoice.state = STATE.ACTIVE
     end
     invoice.nextPeriodDay = g_currentMission.environment.currentMonotonicDay + invoice.repeatDays
-    self:finishIfDone(invoice)
 
     self:notify(invoice.creatorFarmId, "uwm_notify_accepted", invoice)
+    if self:finishIfDone(invoice) then
+        -- one-off electricity is delivered right away: the receipt says how much really arrived
+        self:sendReceipt(invoice)
+    end
     self:setDirty()
 
     return true, "uwm_result_accepted"
@@ -281,7 +320,7 @@ function UWMManager:declineInvoice(farmId, invoice)
     if invoice.state ~= STATE.PENDING or farmId == invoice.creatorFarmId then
         return false, "uwm_error_notPending"
     end
-    invoice.state = STATE.DECLINED
+    self:finish(invoice, STATE.DECLINED)
     self:notify(invoice.creatorFarmId, "uwm_notify_declined", invoice)
     self:setDirty()
     return true, "uwm_result_declined"
@@ -292,17 +331,55 @@ function UWMManager:cancelInvoice(farmId, invoice)
         if farmId ~= invoice.creatorFarmId then
             return false, "uwm_error_ownInvoiceOnly"
         end
-        invoice.state = STATE.CANCELLED
+        self:finish(invoice, STATE.CANCELLED)
         self:notify(invoice:getOtherFarmId(farmId), "uwm_notify_withdrawn", invoice)
     elseif invoice.state == STATE.ACTIVE then
         self:refundOwed(invoice)
-        invoice.state = STATE.CANCELLED
+        self:finish(invoice, STATE.CANCELLED)
         self:notify(invoice:getOtherFarmId(farmId), "uwm_notify_ended", invoice)
+        self:sendReceipt(invoice)
     else
         return false, "uwm_error_finished"
     end
     self:setDirty()
     return true, "uwm_result_cancelled"
+end
+
+-- a finished invoice leaves this farm's history; once both farms deleted it, it's gone
+function UWMManager:hideFor(farmId, invoice)
+    if farmId == invoice.sellerFarmId then
+        invoice.hiddenBySeller = true
+    end
+    if farmId == invoice.buyerFarmId then
+        invoice.hiddenByBuyer = true
+    end
+    if invoice.hiddenBySeller and invoice.hiddenByBuyer then
+        self:removeInvoice(invoice)
+    end
+end
+
+function UWMManager:deleteInvoice(farmId, invoice)
+    if not invoice:getIsFinished() then
+        return false, "uwm_error_notFinished"
+    end
+    self:hideFor(farmId, invoice)
+    self:setDirty()
+    return true, "uwm_result_deleted"
+end
+
+function UWMManager:clearHistory(farmId)
+    local finished = {}
+    for _, invoice in ipairs(self.invoices) do
+        if invoice:getIsFinished() and (invoice.sellerFarmId == farmId or invoice.buyerFarmId == farmId)
+            and not invoice:getIsHiddenFor(farmId) then
+            table.insert(finished, invoice)
+        end
+    end
+    for _, invoice in ipairs(finished) do
+        self:hideFor(farmId, invoice)
+    end
+    self:setDirty()
+    return true, "uwm_result_historyCleared"
 end
 
 -- money back for paid liters the buyer never collected
@@ -311,15 +388,13 @@ function UWMManager:refundOwed(invoice)
         local refund = invoice:getPrice(invoice.owedLiters)
         self:transferMoney(invoice, -refund)
         invoice.totalRefund = invoice.totalRefund + refund
+        invoice.refundedLiters = invoice.refundedLiters + invoice.owedLiters
         invoice.owedLiters = 0
-        if refund > 0 then
-            self:notify(invoice.buyerFarmId, "uwm_notify_refund", invoice)
-        end
     end
 end
 
 -- one delivery period: pay for the liters (manure / slurry) or deliver and pay for electricity
--- returns ok, l10n key of the problem
+-- returns ok, l10n key of the problem, liters delivered / paid for, money paid
 function UWMManager:runPeriod(invoice)
     local liters
     if invoice:getIsElectricity() then
@@ -347,6 +422,8 @@ function UWMManager:runPeriod(invoice)
         end
         self:transferMoney(invoice, invoice:getPrice(added))
         invoice.totalLiters = invoice.totalLiters + added
+        invoice.statusKey = ""
+        return true, nil, added, invoice:getPrice(added)
     else
         if invoice.amountMode == UWMInvoice.AMOUNT.ALL then
             -- liters already paid for and still waiting to be collected are part of the stock: don't bill them twice
@@ -364,17 +441,16 @@ function UWMManager:runPeriod(invoice)
         end
         self:transferMoney(invoice, price)
         invoice.owedLiters = invoice.owedLiters + liters
+        invoice.statusKey = ""
+        return true, nil, liters, price
     end
-
-    invoice.statusKey = ""
-    return true, nil
 end
 
 function UWMManager:finishIfDone(invoice)
     if invoice.state == STATE.ACTIVE and invoice.repeatDays == UWMInvoice.REPEAT_ONCE
         and (invoice:getIsElectricity() or invoice.owedLiters <= UWMManager.EPSILON) then
         invoice.owedLiters = 0
-        invoice.state = STATE.DONE
+        self:finish(invoice, STATE.DONE)
         return true
     end
     return false
@@ -420,6 +496,7 @@ function UWMManager:collect(farmId, fillTypeIndex, liters, sellerFarmId)
                 collected = collected + taken
                 if self:finishIfDone(invoice) then
                     self:notify(invoice.sellerFarmId, "uwm_notify_collected", invoice)
+                    self:sendReceipt(invoice)
                 end
                 self.syncDirty = true
             end
@@ -439,6 +516,7 @@ function UWMManager:returnCollected(farmId, fillTypeIndex, liters, sellerFarmId)
             invoice.owedLiters = invoice.owedLiters + back
             if invoice.state == STATE.DONE then
                 invoice.state = STATE.ACTIVE
+                invoice.finishedDay = 0
             end
             self.syncDirty = true
             return
@@ -458,10 +536,13 @@ function UWMManager:onDayChanged()
     for _, invoice in ipairs(self.invoices) do
         if invoice.state == STATE.ACTIVE and invoice.repeatDays > 0 and today >= invoice.nextPeriodDay then
             invoice.nextPeriodDay = today + invoice.repeatDays
-            local ok, key = self:runPeriod(invoice)
+            local ok, key, liters, money = self:runPeriod(invoice)
             if ok then
-                self:notify(invoice.buyerFarmId, "uwm_notify_contractRun", invoice)
-                self:notify(invoice.sellerFarmId, "uwm_notify_contractRun", invoice)
+                local UWM = UtilitiesWasteManagement
+                local periodKey = invoice:getIsElectricity() and "uwm_receipt_periodDelivered" or "uwm_receipt_periodPaid"
+                local line = string.format(UWM.getText(periodKey), UWM.formatAmount(invoice.fillTypeIndex, liters), UWM.formatMoney(money))
+                self:notify(invoice.buyerFarmId, "uwm_notify_contractRun", invoice, line)
+                self:notify(invoice.sellerFarmId, "uwm_notify_contractRun", invoice, line)
             else
                 invoice.statusKey = key
                 self:notify(invoice.buyerFarmId, "uwm_notify_contractFailed", invoice)

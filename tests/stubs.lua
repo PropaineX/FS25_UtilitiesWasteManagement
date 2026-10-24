@@ -30,7 +30,9 @@ I18N = {getText = function(_, t) return t end}
 function addModEventListener() end
 g_currentModName = "FS25_UtilitiesWasteManagement"
 g_currentModDirectory = ""
-UWMFrame = {unregister = function() end, register = function() end}  -- GUI not tested here
+-- the ESC page: only its text builders are tested (gui/UWMFrame.lua is loaded after the scripts)
+TabbedMenuFrameElement = {new = function() return {} end}
+InputAction = {}
 
 -- storages
 Storage = {}
@@ -80,8 +82,10 @@ g_currentMission = {
 }
 g_messageCenter = {subscribe = function() end, unsubscribeAll = function() end}
 MessageType = {DAY_CHANGED = 1}
-g_server = {broadcastEvent = function(_, ev) if ev.key then table.insert(notifications, ev.farmId .. ":" .. ev.key) end end}
-g_i18n = {getText = function(_, k) return k end, formatVolume = function(_, v) return tostring(v) end, formatMoney = function(_, v) return tostring(v) end, formatNumber = function(_, v) return tostring(v) end}
+notificationDetails = {}
+g_server = {broadcastEvent = function(_, ev) if ev.key then table.insert(notifications, ev.farmId .. ":" .. ev.key) table.insert(notificationDetails, ev.detail or "") end end}
+-- texts: the real ones from modDesc.xml (run.py fills UWM_TEXTS), else the key
+g_i18n = {getText = function(_, k) return (UWM_TEXTS ~= nil and UWM_TEXTS[k]) or k end, formatVolume = function(_, v) return tostring(v) end, formatMoney = function(_, v) return tostring(v) end, formatNumber = function(_, v) return tostring(v) end}
 
 -- network stream: one queue
 stream = {}

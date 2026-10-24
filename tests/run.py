@@ -9,7 +9,12 @@ runner = lua.execute("return function(s, n) local f, e = loadstring(s, n) if not
 def run(path):
     return runner(path.read_text(encoding="utf-8"), "@" + path.name)
 
+# the real English texts from modDesc.xml, so tests can check what players will read
+import xml.etree.ElementTree as ET
+texts = lua.table_from({e.get("name"): e.findtext("en") for e in ET.parse(mod / "modDesc.xml").iter("text")})
+lua.globals().UWM_TEXTS = texts
+
 run(tests / "stubs.lua")
-for name in ["UWMInvoice", "UWMStock", "UWMManager", "UWMEvents", "UWMPickup", "UtilitiesWasteManagement"]:
+for name in ["UWMInvoice", "UWMStock", "UWMManager", "UWMEvents", "UWMPickup", "UtilitiesWasteManagement", "gui/UWMFrame"]:
     run(mod / "scripts" / (name + ".lua"))
 sys.exit(1 if run(tests / "scenarios.lua") else 0)

@@ -1,6 +1,6 @@
 # Utilities & Waste Management (FS25)
 
-Farming Simulator 25 mod by PropaineX. Version 0.2.0.0 (work in progress).
+Farming Simulator 25 mod by PropaineX. Version 0.3.0.0 (work in progress).
 
 Farms trade **electricity, slurry and manure** with each other through invoices, in multiplayer or with
 several farms in singleplayer.
@@ -15,6 +15,8 @@ several farms in singleplayer.
   slurry pit, manure heap or silo: the R list shows only what was paid for, and the liters come out of the
   seller's stock. The buyer can **reserve** the liters so the seller can't use them. Liters never collected are
   refunded when the invoice ends.
+- **Details** on every invoice: ordered, delivered / collected, refunded, what the buyer paid and the seller got.
+  Finished invoices can be deleted from your own list (or the whole history cleared).
 - Payments show on the finance page as "Utility sales" / "Utility purchases". Everything is saved with the
   savegame and synced to every player.
 

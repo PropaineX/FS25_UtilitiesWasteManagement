@@ -11,6 +11,14 @@ local function getText(key)
     return UtilitiesWasteManagement.getText(key)
 end
 
+-- electricity is counted in kWh: its texts have a "KWh" twin (uwm_wizard_liters -> uwm_wizard_litersKWh)
+local function unitKey(invoice, key)
+    if invoice.fillTypeIndex == FillType.ELECTRICCHARGE then
+        return key .. "KWh"
+    end
+    return key
+end
+
 function UWMWizard.new()
     local self = setmetatable({}, UWMWizard_mt)
     self.farmId = UtilitiesWasteManagement.getLocalFarmId()
@@ -125,7 +133,7 @@ function UWMWizard:askLiters()
         end
         self.invoice.liters = liters
         self:askPrice()
-    end, self, "", getText("uwm_wizard_liters"), getText("uwm_wizard_liters"), 12, getText("uwm_button_next"))
+    end, self, "", getText(unitKey(self.invoice, "uwm_wizard_liters")), getText(unitKey(self.invoice, "uwm_wizard_liters")), 12, getText("uwm_button_next"))
 end
 
 -- the game's price for 1,000 liters, shown as a guide
@@ -138,10 +146,10 @@ function UWMWizard:getMarketPricePer1000()
 end
 
 function UWMWizard:askPrice()
-    local prompt = getText("uwm_wizard_price")
+    local prompt = getText(unitKey(self.invoice, "uwm_wizard_price"))
     local market = self:getMarketPricePer1000()
     if market ~= nil then
-        prompt = prompt .. "\n" .. string.format(getText("uwm_wizard_marketHint"), UtilitiesWasteManagement.formatMoney(market))
+        prompt = prompt .. "\n" .. string.format(getText(unitKey(self.invoice, "uwm_wizard_marketHint")), UtilitiesWasteManagement.formatMoney(market))
     end
     local default = market ~= nil and tostring(math.floor(market + 0.5)) or ""
 
@@ -156,7 +164,7 @@ function UWMWizard:askPrice()
         end
         self.invoice.pricePer1000 = price
         self:askRepeat()
-    end, self, default, prompt, getText("uwm_wizard_price"), 12, getText("uwm_button_next"))
+    end, self, default, prompt, getText(unitKey(self.invoice, "uwm_wizard_price")), 12, getText("uwm_button_next"))
 end
 
 function UWMWizard:askRepeat()
@@ -257,7 +265,7 @@ function UWMWizard.getSummary(invoice, farmId, numTargets)
         table.insert(lines, string.format(getText("uwm_summary_amount"), UWM.formatAmount(invoice.fillTypeIndex, invoice.liters),
             UWM.formatMoney(invoice:getPrice(invoice.liters))))
     end
-    table.insert(lines, string.format(getText("uwm_summary_price"), UWM.formatMoney(invoice.pricePer1000)))
+    table.insert(lines, string.format(getText(unitKey(invoice, "uwm_summary_price")), UWM.formatMoney(invoice.pricePer1000)))
 
     local repeatKey = "uwm_repeat_once"
     if invoice.repeatDays == UWMInvoice.REPEAT_DAILY then
