@@ -1,24 +1,43 @@
 <?xml version="1.0" encoding="utf-8" standalone="no" ?>
 <modDesc descVersion="113">
     <author>PropaineX</author>
-    <version>0.3.0.0</version>
+    <version>0.5.0.0</version>
     <title>
-        <en>Utilities &amp; Waste Management</en>
+        <en>Utilities &amp; Waste Management Pro Edition</en>
     </title>
     <description>
         <en><![CDATA[Farms trade electricity, slurry and manure with each other through invoices.
 
 Open the Utilities page in the ESC menu. The farm manager can send a bill (to sell) or an order (to buy) to another farm; that farm's manager accepts or declines it. Set the amount, or take everything the seller has in stock, and set your own price per 1,000 liters (the game's price is shown as a guide). Trade once, or every day or every week until either farm ends it.
 
-Electricity goes straight from the seller's power-producing productions into the buyer's productions the buyer picked, and is paid for as it arrives. Slurry and manure are paid for up front and collected by anyone on the buying farm: drive up to the seller's slurry pit, manure heap or silo and load as usual, and only what you paid for is offered. The liters come out of the seller's own stock. Buyers can reserve what they paid for, so the seller can't use it. Liters that are never collected are refunded when the invoice ends.
+Everything runs through the Community Depot (shop: Production, Selling points, $268,000). Without a depot on the map there are no invoices. One depot per map; the server admin can allow more on the Utilities page.
+
+Every other farm is offered membership of the depot. Members and the owner share the depot's upkeep equally; it is taken every day. A member who can't pay builds up a debt; two months in a row ending in debt and the farm is suspended until it pays. A member can leave, but can't rejoin for 6 months; any debt is taken from its account when it leaves, even into the red. Farms that said no or are suspended can't send or accept invoices. Invoices they already paid can still be collected or ended.
+
+Electricity goes straight from the seller's power-producing productions into the buyer's productions the buyer picked, and is paid for as it arrives. Slurry and manure are paid for up front and collected by anyone on the buying farm at the depot: slurry at the tank's coupling, manure under the silo's loading pipe. Only what you paid for is offered, and the liters come out of the seller's own stock. Buyers can reserve what they paid for, so the seller can't use it. Liters that are never collected are refunded when the invoice ends. The depot office door opens the Utilities page.
 
 Multiplayer: everything runs on the server and only farm managers can trade.]]></en>
     </description>
     <iconFilename>icon_UtilitiesWasteManagement.dds</iconFilename>
     <multiplayer supported="true" />
 
+    <placeableSpecializations>
+        <specialization name="uwmDepot" className="UWMDepot" filename="scripts/UWMDepot.lua"/>
+    </placeableSpecializations>
+
+    <placeableTypes>
+        <type name="uwmDepot" parent="simplePlaceable" className="Placeable" filename="$dataS/scripts/placeables/Placeable.lua">
+            <specialization name="uwmDepot"/>
+        </type>
+    </placeableTypes>
+
+    <storeItems>
+        <storeItem xmlFilename="placeables/depot/depot.xml"/>
+    </storeItems>
+
     <extraSourceFiles>
         <sourceFile filename="scripts/UWMInvoice.lua" />
+        <sourceFile filename="scripts/UWMListing.lua" />
         <sourceFile filename="scripts/UWMStock.lua" />
         <sourceFile filename="scripts/UWMManager.lua" />
         <sourceFile filename="scripts/UWMEvents.lua" />
@@ -33,29 +52,20 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_menuTitle"><en>Utilities &amp; Waste Management</en></text>
         <text name="uwm_managerYes"><en>You are the farm manager: you can trade</en></text>
         <text name="uwm_managerNo"><en>Only the farm manager can trade</en></text>
-        <text name="uwm_column_good"><en>Good</en></text>
         <text name="uwm_column_farm"><en>Farm</en></text>
-        <text name="uwm_column_role"><en>You are</en></text>
         <text name="uwm_column_amount"><en>Amount</en></text>
         <text name="uwm_column_price"><en>Price</en></text>
         <text name="uwm_column_repeat"><en>Repeats</en></text>
         <text name="uwm_column_status"><en>Status</en></text>
-        <text name="uwm_section_incoming"><en>Waiting for your answer</en></text>
-        <text name="uwm_section_sent"><en>Sent by you</en></text>
-        <text name="uwm_section_active"><en>Active</en></text>
-        <text name="uwm_section_history"><en>History</en></text>
         <text name="uwm_button_new"><en>New invoice</en></text>
         <text name="uwm_button_accept"><en>Accept</en></text>
         <text name="uwm_button_decline"><en>Decline</en></text>
-        <text name="uwm_button_cancel"><en>Cancel</en></text>
         <text name="uwm_button_withdraw"><en>Withdraw</en></text>
         <text name="uwm_button_end"><en>End and refund</en></text>
         <text name="uwm_button_next"><en>Next</en></text>
         <text name="uwm_button_details"><en>Details</en></text>
         <text name="uwm_button_delete"><en>Delete</en></text>
-        <text name="uwm_button_clearHistory"><en>Clear history</en></text>
-        <text name="uwm_role_buying"><en>Buying</en></text>
-        <text name="uwm_role_selling"><en>Selling</en></text>
+        <text name="uwm_button_depot"><en>Depot</en></text>
         <text name="uwm_amount_all"><en>All in stock</en></text>
         <text name="uwm_pricePer1000"><en>%s / 1,000 l</en></text>
         <text name="uwm_pricePer1000kWh"><en>%s / 1,000 kWh</en></text>
@@ -81,6 +91,36 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_finance_expense"><en>Utility purchases</en></text>
         <text name="finance_uwmIncome"><en>Utility sales</en></text>
         <text name="finance_uwmExpense"><en>Utility purchases</en></text>
+        <text name="uwm_finance_depotIncome"><en>Depot upkeep shares</en></text>
+        <text name="uwm_finance_depotExpense"><en>Depot upkeep share</en></text>
+        <text name="finance_uwmDepotIncome"><en>Depot upkeep shares</en></text>
+        <text name="finance_uwmDepotExpense"><en>Depot upkeep share</en></text>
+
+        <!-- the depot building -->
+        <text name="uwm_depot_name"><en>Community Depot</en></text>
+        <text name="uwm_depot_function"><en>Pickup point for slurry and manure bought by invoice. Needed for all Utilities invoices.</en></text>
+        <text name="uwm_action_openDepot"><en>Open the Utilities page</en></text>
+        <text name="uwm_warning_oneDepot"><en>Only one depot is allowed on this map.</en></text>
+
+        <!-- depot status (page header) and the Depot button -->
+        <text name="uwm_depot_title"><en>Community Depot</en></text>
+        <text name="uwm_depot_none"><en>No depot on the map: invoices need one (shop: Production, Selling points)</en></text>
+        <text name="uwm_depot_owner"><en>Your farm owns the depot: your share of the upkeep is %s a day</en></text>
+        <text name="uwm_depot_waiting"><en>Depot: your membership offer is on its way</en></text>
+        <text name="uwm_depot_offered"><en>Depot membership offered (%s a day): press Depot to answer</en></text>
+        <text name="uwm_depot_declined"><en>Not a depot member: no invoices. Press Depot to ask to join</en></text>
+        <text name="uwm_depot_member"><en>Depot member: your share of the upkeep is %s a day</en></text>
+        <text name="uwm_depot_memberOwes"><en>Depot member (%s a day), you owe %s: press Depot to pay</en></text>
+        <text name="uwm_depot_suspended"><en>Depot membership suspended, you owe %s: press Depot to pay</en></text>
+        <text name="uwm_depot_optionJoin"><en>Join the depot (%s a day)</en></text>
+        <text name="uwm_depot_optionDecline"><en>Don't join</en></text>
+        <text name="uwm_depot_optionRequest"><en>Ask to join the depot</en></text>
+        <text name="uwm_depot_optionLeave"><en>Leave the depot (no rejoining for %d months)</en></text>
+        <text name="uwm_depot_left"><en>Left the depot: your farm can ask to rejoin in %d month(s)</en></text>
+        <text name="uwm_confirm_leaveDepot"><en>Leave the depot? Your farm can't send or accept invoices any more and can't ask to rejoin for %d months. Paid invoices can still be collected. Anything your farm owes the depot is taken from its account now, even if that leaves it in the red.</en></text>
+        <text name="uwm_depot_optionPay"><en>Pay what you owe (%s)</en></text>
+        <text name="uwm_depot_optionMultiple"><en>Server: allow more than one depot on the map</en></text>
+        <text name="uwm_depot_optionOneOnly"><en>Server: allow only one depot on the map</en></text>
 
         <!-- new invoice -->
         <text name="uwm_wizard_title"><en>Utilities invoice</en></text>
@@ -122,7 +162,6 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_confirm_withdraw"><en>Withdraw this invoice?</en></text>
         <text name="uwm_confirm_end"><en>End this invoice? The buyer gets the money back for liters not yet collected.</en></text>
         <text name="uwm_confirm_endContract"><en>End this electricity contract?</en></text>
-        <text name="uwm_confirm_delete"><en>Delete this invoice from your history? The other farm keeps its copy until it deletes it too.</en></text>
         <text name="uwm_confirm_clearHistory"><en>Delete all %d finished invoices from your history?</en></text>
 
         <!-- answers to a request -->
@@ -133,6 +172,13 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_result_cancelled"><en>Invoice ended.</en></text>
         <text name="uwm_result_deleted"><en>Invoice deleted.</en></text>
         <text name="uwm_result_historyCleared"><en>History cleared.</en></text>
+        <text name="uwm_result_joined"><en>Your farm joined the depot.</en></text>
+        <text name="uwm_result_notJoined"><en>Your farm did not join the depot.</en></text>
+        <text name="uwm_result_requested"><en>The depot sent your farm a new membership offer.</en></text>
+        <text name="uwm_result_arrearsPaid"><en>Paid. Your farm owes the depot nothing now.</en></text>
+        <text name="uwm_result_left"><en>Your farm left the depot.</en></text>
+        <text name="uwm_result_multipleOn"><en>More than one depot may now be placed on this map.</en></text>
+        <text name="uwm_result_multipleOff"><en>Only one depot may be placed on this map now.</en></text>
         <text name="uwm_error_notServer"><en>The server is not ready.</en></text>
         <text name="uwm_error_noFarm"><en>Join a farm to trade.</en></text>
         <text name="uwm_error_notManager"><en>Only the farm manager can do that.</en></text>
@@ -153,6 +199,16 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_error_noStock"><en>The seller has none in stock</en></text>
         <text name="uwm_error_noSpace"><en>The buyer's productions are full</en></text>
         <text name="uwm_error_noMoney"><en>The buyer doesn't have enough money</en></text>
+        <text name="uwm_error_noDepot"><en>There is no depot on the map. Invoices need one: buy the Community Depot in the shop.</en></text>
+        <text name="uwm_error_notMember"><en>Your farm is not a depot member. Press Depot to join.</en></text>
+        <text name="uwm_error_suspended"><en>Your farm's depot membership is suspended until it pays what it owes.</en></text>
+        <text name="uwm_error_otherNotMember"><en>The other farm is not a depot member, or it is suspended.</en></text>
+        <text name="uwm_error_notAdmin"><en>Only the server admin can change that.</en></text>
+        <text name="uwm_error_noOffer"><en>There is no membership offer to answer.</en></text>
+        <text name="uwm_error_alreadyMember"><en>Your farm already takes part in the depot.</en></text>
+        <text name="uwm_error_offerOpen"><en>Your farm already has an offer: answer it.</en></text>
+        <text name="uwm_error_noArrears"><en>Your farm owes the depot nothing.</en></text>
+        <text name="uwm_error_rejoinWait"><en>Your farm left the depot and can't ask to rejoin yet.</en></text>
 
         <!-- notifications: first %s = the other farm, second %s = the good -->
         <text name="uwm_notify_newBill"><en>%s sent you a bill for %s.</en></text>
@@ -165,6 +221,15 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_notify_contractRun"><en>Contract with %s, %s: %s.</en></text>
         <text name="uwm_notify_receipt"><en>Invoice with %s for %s finished: %s.</en></text>
         <text name="uwm_notify_contractFailed"><en>Contract with %s: %s could not be traded this period.</en></text>
+
+        <!-- depot messages: first %s = the depot owner farm(s), second %s = an amount or a farm -->
+        <text name="uwm_notify_depotOffer"><en>%s's depot: join it to trade by invoice? Your share would be %s a day. Answer on the Utilities page.</en></text>
+        <text name="uwm_notify_depotJoined"><en>Depot (%s): %s joined.</en></text>
+        <text name="uwm_notify_depotLeft"><en>Depot (%s): %s left.</en></text>
+        <text name="uwm_notify_depotDebtTaken"><en>Depot (%s): your farm left, so the %s it owed was taken from its account.</en></text>
+        <text name="uwm_notify_depotUnpaid"><en>Depot (%s): your farm couldn't pay its share today. It owes %s.</en></text>
+        <text name="uwm_notify_depotArrears"><en>Depot (%s): invoice for %s still unpaid. Two months in a row and the membership is suspended.</en></text>
+        <text name="uwm_notify_depotSuspended"><en>Depot (%s): membership suspended until your farm pays %s.</en></text>
 
         <!-- receipt numbers (third %s of the notifications) and the Details box -->
         <text name="uwm_receipt_line"><en>%s delivered or collected, %s paid, %s refunded</en></text>
@@ -188,5 +253,110 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_details_status"><en>Status: %s</en></text>
         <text name="uwm_details_sentDay"><en>Sent on day %d</en></text>
         <text name="uwm_details_finishedDay"><en>Finished on day %d</en></text>
+
+        <!-- standing orders: open to every farm -->
+        <text name="uwm_receipt_deal"><en>%s for %s</en></text>
+        <text name="uwm_receipt_atPrice"><en>%s at %s per 1,000 liters</en></text>
+        <text name="uwm_receipt_atPriceKWh"><en>%s at %s per 1,000 kWh</en></text>
+        <text name="uwm_notify_listingOffer"><en>%s has %s for sale to any farm: %s.</en></text>
+        <text name="uwm_notify_listingWanted"><en>%s wants to buy %s from any farm: %s.</en></text>
+        <text name="uwm_notify_listingBought"><en>%s bought %s from your standing offer: %s.</en></text>
+        <text name="uwm_notify_listingSold"><en>%s sold you %s for your standing order: %s.</en></text>
+        <text name="uwm_notify_listingComplete"><en>%s took the last of your standing order for %s. Complete: %s.</en></text>
+        <text name="uwm_result_listingPosted"><en>Standing order posted. Every farm can see it now.</en></text>
+        <text name="uwm_result_listingBought"><en>Bought and paid. Slurry and manure are collected at the depot; electricity is already in your productions.</en></text>
+        <text name="uwm_result_listingSold"><en>Sold, and you've been paid. The buyer collects it at the depot.</en></text>
+        <text name="uwm_result_listingWithdrawn"><en>Standing order withdrawn.</en></text>
+        <text name="uwm_result_listingDeleted"><en>Standing order deleted.</en></text>
+        <text name="uwm_error_unknownListing"><en>That standing order no longer exists.</en></text>
+        <text name="uwm_error_listingClosed"><en>That standing order is closed.</en></text>
+        <text name="uwm_error_ownListing"><en>That is your own standing order.</en></text>
+        <text name="uwm_error_notYourListing"><en>Only the farm that posted it can do that.</en></text>
+        <text name="uwm_error_listingTooMuch"><en>That is more than is left on the standing order.</en></text>
+        <text name="uwm_error_listingNoStock"><en>Your farm doesn't have that much in stock (anything already sold or reserved doesn't count).</en></text>
+        <text name="uwm_error_listingNoMoney"><en>Your farm doesn't have the money for the whole order. It is paid up front and held until sellers deliver.</en></text>
+
+        <!-- page tabs (0.5) -->
+        <text name="uwm_balance"><en>Balance:</en></text>
+        <text name="uwm_tab_incoming"><en>Incoming</en></text>
+        <text name="uwm_tab_outgoing"><en>Outgoing</en></text>
+        <text name="uwm_tab_board"><en>Standing orders</en></text>
+        <text name="uwm_tab_market"><en>Market</en></text>
+        <text name="uwm_tab_myOrders"><en>My orders</en></text>
+        <text name="uwm_tab_myDeals"><en>My deals</en></text>
+        <text name="uwm_column_number"><en>Invoice #</en></text>
+        <text name="uwm_column_order"><en>Order #</en></text>
+        <text name="uwm_column_day"><en>Day</en></text>
+        <text name="uwm_column_description"><en>Description</en></text>
+        <text name="uwm_column_type"><en>Type</en></text>
+        <text name="uwm_column_product"><en>Product</en></text>
+        <text name="uwm_column_left"><en>Left</en></text>
+        <text name="uwm_column_of"><en>Of</en></text>
+        <text name="uwm_column_held"><en>Held</en></text>
+        <text name="uwm_column_deals"><en>Deals</en></text>
+        <text name="uwm_column_volume"><en>Volume</en></text>
+        <text name="uwm_column_toCollect"><en>To collect</en></text>
+        <text name="uwm_column_you"><en>You</en></text>
+        <text name="uwm_dealsTitle"><en>Your open deals on standing orders</en></text>
+        <text name="uwm_cell_day"><en>Day %d</en></text>
+        <text name="uwm_cell_descBuy"><en>%s, %s (you buy)</en></text>
+        <text name="uwm_cell_descSell"><en>%s, %s (you sell)</en></text>
+        <text name="uwm_cell_theyCollect"><en>%s (buyer)</en></text>
+        <text name="uwm_type_forSale"><en>For sale</en></text>
+        <text name="uwm_type_wanted"><en>Wanted</en></text>
+        <text name="uwm_held_stock"><en>Stock</en></text>
+        <text name="uwm_held_money"><en>Money</en></text>
+        <text name="uwm_role_bought"><en>Bought</en></text>
+        <text name="uwm_role_sold"><en>Sold</en></text>
+        <text name="uwm_state_waitingForYou"><en>Waiting for you</en></text>
+        <text name="uwm_state_active"><en>Active</en></text>
+        <text name="uwm_listing_open"><en>Open</en></text>
+        <text name="uwm_listing_done"><en>Complete</en></text>
+        <text name="uwm_listing_withdrawn"><en>Withdrawn</en></text>
+        <text name="uwm_empty_invoices"><en>No invoices here.</en></text>
+        <text name="uwm_empty_market"><en>No standing orders from other farms right now.</en></text>
+        <text name="uwm_empty_openDeals"><en>No open deals.</en></text>
+        <text name="uwm_empty_myOrders"><en>You have not posted any standing orders.</en></text>
+        <text name="uwm_empty_myDeals"><en>No deals on standing orders yet.</en></text>
+        <text name="uwm_button_newListing"><en>New standing order</en></text>
+        <text name="uwm_button_acceptPay"><en>Accept and pay</en></text>
+        <text name="uwm_button_buy"><en>Buy</en></text>
+        <text name="uwm_button_sellTo"><en>Sell to them</en></text>
+        <text name="uwm_delete_question"><en>What do you want to delete?</en></text>
+        <text name="uwm_delete_one"><en>Just this one</en></text>
+        <text name="uwm_delete_all"><en>Everything finished (%d)</en></text>
+
+        <!-- standing orders: wizard, confirm, details -->
+        <text name="uwm_wizard_listingTitle"><en>Standing order</en></text>
+        <text name="uwm_wizard_kind"><en>Sell to any farm, or buy from any farm?</en></text>
+        <text name="uwm_wizard_kindOffer"><en>Sell: put it up for sale, any farm buys part of it</en></text>
+        <text name="uwm_wizard_kindWanted"><en>Buy: ask for it, any farm sells you part of it</en></text>
+        <text name="uwm_wizard_tradeBuy"><en>How much do you want to buy? %s left, at %s.</en></text>
+        <text name="uwm_wizard_tradeSell"><en>How much do you want to sell them? %s still wanted, at %s.</en></text>
+        <text name="uwm_wizard_tradeYouHave"><en>You have %s free in stock.</en></text>
+        <text name="uwm_summary_listingOffer"><en>Standing offer: sell %s to any farm</en></text>
+        <text name="uwm_summary_listingWanted"><en>Standing order: buy %s from any farm</en></text>
+        <text name="uwm_summary_listingStockHeld"><en>The amount is held in your stock from now on: you can't load it out or sell it elsewhere until it is sold or you withdraw the offer.</en></text>
+        <text name="uwm_summary_listingMoneyHeld"><en>The total is taken from your account now and held. Sellers are paid from it; what's left comes back if you withdraw the order.</en></text>
+        <text name="uwm_summary_tradeBuy"><en>Buy %s of %s from %s for %s</en></text>
+        <text name="uwm_summary_tradeSell"><en>Sell %s of %s to %s for %s</en></text>
+        <text name="uwm_confirm_postListing"><en>Post this standing order?</en></text>
+        <text name="uwm_confirm_tradeBuy"><en>Buy and pay now? You collect it at the depot.</en></text>
+        <text name="uwm_confirm_tradeSell"><en>Sell? You are paid now; the buyer collects it from your stock at the depot.</en></text>
+        <text name="uwm_confirm_tradeBuyKWh"><en>Buy and pay now? The electricity goes into your productions right away; you pay only for what fits.</en></text>
+        <text name="uwm_confirm_tradeSellKWh"><en>Sell? The electricity goes straight into their productions and you are paid for what fits.</en></text>
+        <text name="uwm_confirm_withdrawOffer"><en>Withdraw this standing offer? The stock held for it is free again. Sales already made stay as they are.</en></text>
+        <text name="uwm_confirm_withdrawWanted"><en>Withdraw this standing order? The %s held for the rest comes back to your account. Deals already made stay as they are.</en></text>
+        <text name="uwm_details_fromListing"><en>From standing order SO-%03d</en></text>
+        <text name="uwm_details_listingTitle"><en>Standing order SO-%03d: %s</en></text>
+        <text name="uwm_details_listingOffer"><en>For sale by: %s</en></text>
+        <text name="uwm_details_listingWanted"><en>Wanted by: %s</en></text>
+        <text name="uwm_details_listingTotal"><en>Total: %s</en></text>
+        <text name="uwm_details_listingLeft"><en>Left: %s</en></text>
+        <text name="uwm_details_listingTraded"><en>Traded: %s in %d deal(s)</en></text>
+        <text name="uwm_details_listingMoney"><en>Money: %s</en></text>
+        <text name="uwm_details_listingStockHeld"><en>Stock held for it: %s</en></text>
+        <text name="uwm_details_listingMoneyHeld"><en>Money held for the rest: %s</en></text>
+        <text name="uwm_details_postedDay"><en>Posted on day %d</en></text>
     </l10n>
 </modDesc>

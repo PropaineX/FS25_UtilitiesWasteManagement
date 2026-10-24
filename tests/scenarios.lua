@@ -7,12 +7,20 @@ local function check(name, cond, info)
 end
 local function near(a, b) return math.abs(a - b) < 0.01 end
 
-local function reset()
+local depot
+local function reset(noDepot)
     g_currentMission.placeableSystem.placeables = {}
     for _, f in pairs(farms) do f.money = 10000 end
     notifications = {}
     UtilitiesWasteManagement:loadMap("")
     M = UtilitiesWasteManagement.manager
+    removeDepots()
+    depot = nil
+    if not noDepot then
+        depot = newDepot(1, 0)
+        M.members[2] = UWMManager.newMember(UWMManager.MEMBER.MEMBER)
+        M.members[3] = UWMManager.newMember(UWMManager.MEMBER.MEMBER)
+    end
 end
 local function add(p) table.insert(g_currentMission.placeableSystem.placeables, p) return p end
 local function order(user, sellerFarm, buyerFarm, ft, mode, liters, price, rep, reserve, targets)
@@ -181,18 +189,21 @@ check("refused accept leaves the buyer's choices off the invoice", not ok and #e
 check("remote accept: 2650 kWh moved, 927.50 paid", near(bakery.spec_productionPoint.productionPoint.storage:getFillLevel(FillType.ELECTRICCHARGE), 2650)
     and near(farms[2].money, 10000 - 927.5) and near(farms[1].money, 10000 + 927.5) and inv.state == UWMInvoice.STATE.DONE)
 
--- 11. the buyer collects at the SELLER's own slurry pit (what the buyer tried in the first multiplayer test)
+-- 11. the buyer collects at the DEPOT; the seller's own slurry pit no longer serves buyers (removed in 0.4)
 reset()
 local barn = add(newPlaceable(1, "spec_husbandry", {storage = newStorage({[FillType.LIQUIDMANURE] = 50000, [FillType.MANURE] = 0})}, "cowBarn"))
-local pitStation = newStation(barn, barn.spec_husbandry.storage)
+local barnStation = newStation(barn, barn.spec_husbandry.storage)
+local pitStation = newDepotStation(depot)
 local tanker = newTanker(2, 6000)
-check("before paying: buyer may not load at the seller's pit", not pitStation:getIsFillAllowedToFarm(2))
+check("before paying: buyer may not load at the depot", not pitStation:getIsFillAllowedToFarm(2))
 order(20, 1, 2, FillType.LIQUIDMANURE, UWMInvoice.AMOUNT.FIXED, 10000, 33, 0, true)
 inv = last(); M:handleRequest(A.ACCEPT, 10, {invoiceId = inv.id})
-check("after paying: buyer may load there", pitStation:getIsFillAllowedToFarm(2))
+check("after paying: buyer may load at the depot", pitStation:getIsFillAllowedToFarm(2))
+check("but not at the seller's own pit any more", not barnStation:getIsFillAllowedToFarm(2)
+    and barnStation:addFillLevelToFillableObject(newTanker(2, 999), 1, FillType.LIQUIDMANURE, 500) == 0)
 local list = pitStation:getAllFillLevels(2)
 check("R list shows only the paid slurry, 10000 l", near(list[FillType.LIQUIDMANURE] or 0, 10000) and list[FillType.MANURE] == nil)
-local own = pitStation:getAllFillLevels(1)
+local own = barnStation:getAllFillLevels(1)
 check("the seller still sees his whole pit", near(own[FillType.LIQUIDMANURE], 50000))
 got = pitStation:addFillLevelToFillableObject(tanker, 1, FillType.LIQUIDMANURE, 4000, nil, ToolType.TRIGGER)
 check("buyer loads 4000: tanker +4000, pit -4000, 6000 left", near(got, 4000) and near(tanker.level, 4000)
@@ -201,13 +212,13 @@ got = pitStation:addFillLevelToFillableObject(tanker, 1, FillType.LIQUIDMANURE, 
 check("tanker full at 6000: only 2000 more taken", near(got, 2000) and near(tanker.level, 6000) and near(inv.owedLiters, 4000)
     and near(barn.spec_husbandry.storage:getFillLevel(FillType.LIQUIDMANURE), 44000))
 local sellerTanker = newTanker(1, 99999)
-got = pitStation:addFillLevelToFillableObject(sellerTanker, 1, FillType.LIQUIDMANURE, 99999, nil, ToolType.TRIGGER)
+got = barnStation:addFillLevelToFillableObject(sellerTanker, 1, FillType.LIQUIDMANURE, 99999, nil, ToolType.TRIGGER)
 check("seller's own tanker can't take the buyer's reserved 4000", near(got, 40000)
     and near(barn.spec_husbandry.storage:getFillLevel(FillType.LIQUIDMANURE), 4000))
 local secondTanker = newTanker(2, 99999)
 got = pitStation:addFillLevelToFillableObject(secondTanker, 1, FillType.LIQUIDMANURE, 99999, nil, ToolType.TRIGGER)
 check("buyer's second trip takes the last 4000, invoice done", near(got, 4000) and inv.state == UWMInvoice.STATE.DONE)
-check("done: buyer no longer allowed at the pit", not pitStation:getIsFillAllowedToFarm(2))
+check("done: buyer no longer allowed at the depot", not pitStation:getIsFillAllowedToFarm(2))
 local stranger = newTanker(3, 99999)
 check("a farm with no invoice gets nothing", pitStation:addFillLevelToFillableObject(stranger, 1, FillType.LIQUIDMANURE, 1000) == 0)
 
@@ -239,7 +250,7 @@ check("both farms got the receipt numbers", receipts == 2, table.concat(notifica
 -- 13. slurry: paid 10000, collected 4000, ended -> 6000 refunded, all on the details
 reset()
 barn = add(newPlaceable(1, "spec_husbandry", {storage = newStorage({[FillType.LIQUIDMANURE] = 50000})}, "cowBarn"))
-pitStation = newStation(barn, barn.spec_husbandry.storage)
+pitStation = newDepotStation(depot)
 order(20, 1, 2, FillType.LIQUIDMANURE, UWMInvoice.AMOUNT.FIXED, 10000, 33)
 inv = last(); M:handleRequest(A.ACCEPT, 10, {invoiceId = inv.id})
 pitStation:addFillLevelToFillableObject(newTanker(2, 4000), 1, FillType.LIQUIDMANURE, 9999, nil, ToolType.TRIGGER)
@@ -276,6 +287,371 @@ stream = {}
 M:writeStream(0)
 copy = UWMManager.new(false); copy:readStream(0)
 check("hidden flags and refund liters travel to clients", copy.invoices[#copy.invoices].hiddenByBuyer and #stream == 0)
+
+
+-- 15. no depot on the map: no invoices at all, contracts skip their period
+reset(true)
+pit = add(newPlaceable(1, "spec_husbandry", {storage = newStorage({[FillType.MANURE] = 5000})}))
+ok, key = order(20, 1, 2, FillType.MANURE, UWMInvoice.AMOUNT.FIXED, 1000, 10)
+check("no depot: order refused", not ok and key == "uwm_error_noDepot" and #M.invoices == 0, key)
+check("no depot: the Utilities tab is hidden", UWMFrame.getIsPageEnabled() == false)
+check("no depot: header says so", UWMFrame.getDepotStatusText(2) == UWM_TEXTS.uwm_depot_none, UWMFrame.getDepotStatusText(2))
+depot = newDepot(1, 0)
+check("depot built: the tab shows", UWMFrame.getIsPageEnabled() == true)
+M.members[2] = UWMManager.newMember(UWMManager.MEMBER.MEMBER)
+order(20, 1, 2, FillType.MANURE, UWMInvoice.AMOUNT.FIXED, 1000, 10, UWMInvoice.REPEAT_DAILY)
+inv = last(); M:handleRequest(A.ACCEPT, 10, {invoiceId = inv.id})
+check("with a depot: daily contract runs, 10 paid", inv.state == UWMInvoice.STATE.ACTIVE and near(farms[2].money, 9990))
+removeDepots()
+g_currentMission.environment.currentMonotonicDay = 2
+M:onDayChanged()
+check("depot sold: contract period skipped, nothing paid", near(farms[2].money, 9990) and inv.statusKey == "uwm_error_noDepot", inv.statusKey)
+g_currentMission.environment.currentMonotonicDay = 1
+
+-- 16. a depot is placed: every other farm gets the offer; Yes / No / ask again; only the manager answers
+reset(true)
+depot = newDepot(1, 268)
+M:updateMemberships()
+check("farms 2 and 3 offered, the owner not", M.members[2].state == UWMManager.MEMBER.OFFERED and M.members[3].state == UWMManager.MEMBER.OFFERED
+    and M.members[1] == nil)
+local offers = 0
+for _, n in ipairs(notifications) do if n == "2:uwm_notify_depotOffer" or n == "3:uwm_notify_depotOffer" then offers = offers + 1 end end
+check("both got the offer message", offers == 2, table.concat(notifications, " "))
+check("the offer shows the share after joining: 268 / 2 = 134", near(M:getDailyShare(2), 134))
+check("header: offered", UWMFrame.getDepotStatusText(2) == string.format(UWM_TEXTS.uwm_depot_offered, "134"), UWMFrame.getDepotStatusText(2))
+ok, key = order(20, 1, 2, FillType.MANURE, UWMInvoice.AMOUNT.FIXED, 10, 1)
+check("not yet a member: can't order", not ok and key == "uwm_error_notMember", key)
+farms[2].members = {[21] = true}
+ok, key = M:handleRequest(A.JOIN_DEPOT, 21, {})
+check("a non-manager can't answer", not ok and key == "uwm_error_notManager", key)
+ok, key = M:handleRequest(A.JOIN_DEPOT, 20, {})
+check("farm 2 joins", ok and M:getIsParticipant(2) and key == "uwm_result_joined", key)
+ok, key = M:handleRequest(A.DECLINE_DEPOT, 30, {})
+check("farm 3 says no", ok and M.members[3].state == UWMManager.MEMBER.DECLINED, key)
+ok, key = order(20, 3, 2, FillType.MANURE, UWMInvoice.AMOUNT.FIXED, 10, 1)
+check("member can't trade with a farm that said no", not ok and key == "uwm_error_otherNotMember", key)
+ok, key = order(20, 1, 2, FillType.MANURE, UWMInvoice.AMOUNT.FIXED, 10, 1)
+check("member trades with the owner", ok, key)
+local opts = UWMFrame.getDepotOptions(3, true, false)
+check("Depot button for farm 3: ask to join", #opts == 1 and opts[1].action == A.REQUEST_DEPOT)
+ok, key = M:handleRequest(A.REQUEST_DEPOT, 30, {})
+check("farm 3 asks again: new offer", ok and M.members[3].state == UWMManager.MEMBER.OFFERED, key)
+M:updateMemberships()
+check("no double offers", M.members[3].state == UWMManager.MEMBER.OFFERED)
+opts = UWMFrame.getDepotOptions(3, true, false)
+check("Depot button for farm 3 now: join / don't join", #opts == 2 and opts[1].action == A.JOIN_DEPOT and opts[2].action == A.DECLINE_DEPOT)
+check("owner: no membership options, header says owner", #UWMFrame.getDepotOptions(1, true, false) == 0
+    and UWMFrame.getDepotStatusText(1) == string.format(UWM_TEXTS.uwm_depot_owner, "134"), UWMFrame.getDepotStatusText(1))
+
+-- 17. upkeep shared equally every day; a broke member builds arrears; two months with arrears = suspended
+reset(true)
+depot = newDepot(1, 270)
+M.members[2] = UWMManager.newMember(UWMManager.MEMBER.MEMBER)
+M.members[3] = UWMManager.newMember(UWMManager.MEMBER.MEMBER)
+farms[3].money = 50
+M:onDayChanged()
+check("member 2 paid its share 90 to the owner", near(farms[2].money, 9910) and near(farms[1].money, 10090), farms[1].money)
+check("member 3 couldn't pay: owes 90", near(farms[3].money, 50) and near(M.members[3].arrears, 90))
+M:onPeriodChanged()
+check("month 1 ends with arrears: missed 1, not suspended", M.members[3].missedMonths == 1 and not M.members[3].suspended)
+check("member 2 has no arrears: missed 0", M.members[2].missedMonths == 0)
+M:onDayChanged()
+M:onPeriodChanged()
+check("month 2 too: suspended, owes 180", M.members[3].suspended and near(M.members[3].arrears, 180))
+ok, key = order(30, 1, 3, FillType.MANURE, UWMInvoice.AMOUNT.FIXED, 10, 1)
+check("suspended farm can't order", not ok and key == "uwm_error_suspended", key)
+ok, key = order(20, 3, 2, FillType.MANURE, UWMInvoice.AMOUNT.FIXED, 10, 1)
+check("others can't trade with it either", not ok and key == "uwm_error_otherNotMember", key)
+check("header: suspended, owes 180", UWMFrame.getDepotStatusText(3) == string.format(UWM_TEXTS.uwm_depot_suspended, "180"), UWMFrame.getDepotStatusText(3))
+ok, key = M:handleRequest(A.PAY_ARREARS, 30, {})
+check("can't pay 180 with 50", not ok and key == "uwm_error_noMoney", key)
+farms[3].money = 1000
+local ownerBefore = farms[1].money
+ok, key = M:handleRequest(A.PAY_ARREARS, 30, {})
+check("pays 180: suspension lifted, owner gets it", ok and not M.members[3].suspended and M.members[3].arrears == 0
+    and near(farms[3].money, 820) and near(farms[1].money, ownerBefore + 180), key)
+ok, key = order(30, 1, 3, FillType.MANURE, UWMInvoice.AMOUNT.FIXED, 10, 1)
+check("trading again after paying", ok, key)
+
+-- 18. one depot per map unless the server admin allows more
+reset(true)
+depot = newDepot(1, 0)
+check("a second depot is blocked", UWMDepot.getPlacingBlocked({}) == true)
+check("the placed one itself is not", UWMDepot.getPlacingBlocked(depot) == false)
+g_currentMission.userManager = {getUserByUserId = function(_, u) return {getIsMasterUser = function() return u == 99 end} end}
+ok, key = M:handleRequest(A.SET_MULTIPLE_DEPOTS, 20, {flag = true})
+check("a farm manager is not the server admin", not ok and key == "uwm_error_notAdmin", key)
+ok, key = M:handleRequest(A.SET_MULTIPLE_DEPOTS, 99, {flag = true})
+check("admin allows more depots", ok and M.allowMultipleDepots and UWMDepot.getPlacingBlocked({}) == false, key)
+opts = UWMFrame.getDepotOptions(0, false, true)
+check("admin's Depot button switches it back", #opts == 1 and opts[1].action == A.SET_MULTIPLE_DEPOTS and opts[1].flag == false)
+
+-- 19. membership and the setting travel to clients and into the savegame
+reset(true)
+depot = newDepot(1, 0)
+M.members[2] = UWMManager.newMember(UWMManager.MEMBER.MEMBER)
+M.members[2].arrears, M.members[2].missedMonths, M.members[2].suspended = 45.5, 2, true
+M.members[3] = UWMManager.newMember(UWMManager.MEMBER.DECLINED)
+M.allowMultipleDepots = true
+stream = {}
+M:writeStream(0)
+copy = UWMManager.new(false); copy:readStream(0)
+check("members stream to clients", #stream == 0 and copy.allowMultipleDepots and copy.members[2].suspended and near(copy.members[2].arrears, 45.5)
+    and copy.members[2].missedMonths == 2 and copy.members[3].state == UWMManager.MEMBER.DECLINED)
+M:saveToXMLFile("save/depot.xml")
+loaded = UWMManager.new(true)
+loaded:loadFromXMLFile("save/depot.xml")
+check("members saved and loaded", loaded.allowMultipleDepots and loaded.members[2].suspended and near(loaded.members[2].arrears, 45.5)
+    and loaded.members[3].state == UWMManager.MEMBER.DECLINED)
+
+-- 20. at the depot a buyer sees the goods paid for from ALL its sellers; farms 2 and 3 sell to farm 1
+reset()
+local pit2 = add(newPlaceable(2, "spec_husbandry", {storage = newStorage({[FillType.LIQUIDMANURE] = 3000})}))
+local heap3 = add(newPlaceable(3, "spec_manureHeap", {manureHeap = newStorage({[FillType.MANURE] = 8000})}))
+order(10, 2, 1, FillType.LIQUIDMANURE, UWMInvoice.AMOUNT.FIXED, 2000, 10)
+M:handleRequest(A.ACCEPT, 20, {invoiceId = last().id})
+order(10, 3, 1, FillType.MANURE, UWMInvoice.AMOUNT.FIXED, 5000, 10)
+M:handleRequest(A.ACCEPT, 30, {invoiceId = last().id})
+local station = newDepotStation(depot)
+list = station:getAllFillLevels(1)
+check("depot owner as buyer: R list = 2000 slurry + 5000 manure", near(list[FillType.LIQUIDMANURE] or 0, 2000) and near(list[FillType.MANURE] or 0, 5000))
+check("farm 2 paid for nothing: empty list, not allowed", next((station:getAllFillLevels(2))) == nil and not station:getIsFillAllowedToFarm(2))
+local spreader = newTanker(1, 20000)
+got = station:addFillLevelToFillableObject(spreader, 1, FillType.MANURE, 20000, nil, ToolType.TRIGGER)
+check("manure comes out of farm 3's heap", near(got, 5000) and near(heap3.spec_manureHeap.manureHeap:getFillLevel(FillType.MANURE), 3000)
+    and near(pit2.spec_husbandry.storage:getFillLevel(FillType.LIQUIDMANURE), 3000))
+
+-- 21. a member leaves: no more shares, no invoices, can't ask to rejoin for 6 months (user's rule)
+reset(true)
+depot = newDepot(1, 300)
+M.members[2] = UWMManager.newMember(UWMManager.MEMBER.MEMBER)
+M.members[3] = UWMManager.newMember(UWMManager.MEMBER.MEMBER)
+opts = UWMFrame.getDepotOptions(2, true, false)
+check("member's Depot button offers Leave", #opts == 1 and opts[1].action == A.LEAVE_DEPOT)
+ok, key = M:handleRequest(A.LEAVE_DEPOT, 10, {})
+check("the owner can't leave", not ok and key == "uwm_error_notMember", key)
+ok, key = M:handleRequest(A.LEAVE_DEPOT, 20, {})
+check("farm 2 leaves", ok and key == "uwm_result_left" and M.members[2].rejoinWait == 6 and not M:getIsParticipant(2), key)
+M:onDayChanged()
+check("after leaving: share split owner + farm 3 only (150 each), farm 2 pays nothing", near(farms[2].money, 10000) and near(farms[3].money, 9850))
+ok, key = order(20, 1, 2, FillType.MANURE, UWMInvoice.AMOUNT.FIXED, 10, 1)
+check("no invoices after leaving", not ok and key == "uwm_error_notMember", key)
+check("no Ask to join button while waiting", #UWMFrame.getDepotOptions(2, true, false) == 0)
+check("header counts the months", UWMFrame.getDepotStatusText(2) == string.format(UWM_TEXTS.uwm_depot_left, 6), UWMFrame.getDepotStatusText(2))
+ok, key = M:handleRequest(A.REQUEST_DEPOT, 20, {})
+check("can't ask to rejoin yet", not ok and key == "uwm_error_rejoinWait", key)
+M:updateMemberships()
+check("no automatic new offer either", M.members[2].state == UWMManager.MEMBER.DECLINED)
+for _ = 1, 5 do M:onPeriodChanged() end
+check("5 months on: still 1 to wait", M.members[2].rejoinWait == 1 and not M:handleRequest(A.REQUEST_DEPOT, 20, {}))
+stream = {}
+M:writeStream(0)
+copy = UWMManager.new(false); copy:readStream(0)
+M:saveToXMLFile("save/leave.xml"); loaded = UWMManager.new(true); loaded:loadFromXMLFile("save/leave.xml")
+check("the wait travels to clients and the savegame", #stream == 0 and copy.members[2].rejoinWait == 1 and loaded.members[2].rejoinWait == 1)
+M:onPeriodChanged()
+ok, key = M:handleRequest(A.REQUEST_DEPOT, 20, {})
+check("6 months on: may ask again, gets a new offer", ok and M.members[2].state == UWMManager.MEMBER.OFFERED, key)
+
+-- 22. leaving with a debt: taken from the account at once, even into the negative (user's rule)
+reset(true)
+depot = newDepot(1, 300)
+M.members[2] = UWMManager.newMember(UWMManager.MEMBER.MEMBER)
+M.members[2].arrears, M.members[2].missedMonths, M.members[2].suspended = 450, 2, true
+farms[2].money = 100
+ok, key = M:handleRequest(A.LEAVE_DEPOT, 20, {})
+check("a suspended member can leave", ok, key)
+check("debt 450 taken: 100 -> -350, owner +450", near(farms[2].money, -350) and near(farms[1].money, 10450), farms[2].money)
+check("nothing owed any more, not suspended, 6 months wait", M.members[2].arrears == 0 and not M.members[2].suspended
+    and M.members[2].rejoinWait == 6)
+local told = false
+for _, n in ipairs(notifications) do if n == "2:uwm_notify_depotDebtTaken" then told = true end end
+check("the farm is told what was taken", told, table.concat(notifications, " "))
+
+-- 23. standing OFFER: farm 1 puts 1,000,000 l of slurry up for anyone; farms 2 and 3 buy parts (user's idea)
+local function post(user, kind, ft, liters, price, targets)
+    local l = UWMListing.new()
+    l.kind, l.fillTypeIndex, l.liters, l.pricePer1000 = kind, ft, liters, price
+    return M:handleRequest(A.POST_LISTING, user, {listing = l, targets = targets})
+end
+local function lastListing() return M.listings[#M.listings] end
+reset()
+barn = add(newPlaceable(1, "spec_husbandry", {storage = newStorage({[FillType.LIQUIDMANURE] = 1200000}, 2000000)}, "cowBarn"))
+ok, key = post(10, UWMListing.KIND.OFFER, FillType.LIQUIDMANURE, 2000000, 1)
+check("offer: can't offer more than in stock", not ok and key == "uwm_error_listingNoStock", key)
+ok, key = post(10, UWMListing.KIND.OFFER, FillType.LIQUIDMANURE, 1000000, 1)
+local offer = lastListing()
+check("offer posted, open, 1,000,000 left", ok and offer:getIsOpen() and near(offer.remaining, 1000000), key)
+local told2, told3 = false, false
+for _, n in ipairs(notifications) do told2 = told2 or n == "2:uwm_notify_listingOffer"; told3 = told3 or n == "3:uwm_notify_listingOffer" end
+check("every other farm is told", told2 and told3, table.concat(notifications, " "))
+check("offer holds the stock: only 200,000 free", near(UWMStock.getAvailable(1, FillType.LIQUIDMANURE), 200000))
+local r2 = UWMStock.addFillLevelToFillableObject({isServer = true, owningPlaceable = barn}, function(_, _, _, _, d) return d end, newTanker(1, 9999999), 1, FillType.LIQUIDMANURE, 500000)
+check("seller's own tanker can't load the held stock", near(r2, 200000), r2)
+ok, key = M:handleRequest(A.TRADE_LISTING, 10, {listingId = offer.id, liters = 10})
+check("can't buy from your own offer", not ok and key == "uwm_error_ownListing", key)
+ok, key = M:handleRequest(A.TRADE_LISTING, 20, {listingId = offer.id, liters = 50000})
+inv = last()
+check("farm 2 buys 50,000 for 50: paid now", ok and near(farms[2].money, 9950) and near(farms[1].money, 10050), key)
+check("deal = paid, reserved invoice to collect at the depot", inv.listingId == offer.id and inv.state == UWMInvoice.STATE.ACTIVE
+    and inv.reserve and near(inv.owedLiters, 50000) and inv.buyerFarmId == 2 and inv.sellerFarmId == 1)
+check("950,000 left, still all held", near(offer.remaining, 950000) and near(M:getReservedLiters(1, FillType.LIQUIDMANURE), 1000000))
+ok, key = M:handleRequest(A.TRADE_LISTING, 30, {listingId = offer.id, liters = 960000})
+check("can't buy more than is left", not ok and key == "uwm_error_listingTooMuch", key)
+farms[3].money = 100000
+ok, key = M:handleRequest(A.TRADE_LISTING, 30, {listingId = offer.id, liters = 100000})
+check("farm 3 buys 100,000", ok and near(offer.remaining, 850000) and near(farms[3].money, 99900), key)
+farms[2].money = 1000000
+ok, key = M:handleRequest(A.TRADE_LISTING, 20, {listingId = offer.id, liters = 850000})
+check("someone buys the rest: offer complete", ok and offer.state == UWMListing.STATE.DONE and offer.trades == 3
+    and near(offer.tradedLiters, 1000000) and near(offer.totalMoney, 1000), key)
+ok, key = M:handleRequest(A.TRADE_LISTING, 30, {listingId = offer.id, liters = 1})
+check("a finished offer takes no more deals", not ok and key == "uwm_error_listingClosed", key)
+local station = newDepotStation(depot)
+got = station:addFillLevelToFillableObject(newTanker(3, 30000), 1, FillType.LIQUIDMANURE, 30000, nil, ToolType.TRIGGER)
+check("buyer collects at the depot from the seller's barn", near(got, 30000) and near(barn.spec_husbandry.storage:getFillLevel(FillType.LIQUIDMANURE), 1170000))
+
+-- 24. withdrawing an offer frees the held stock; paid deals stay
+reset()
+barn = add(newPlaceable(1, "spec_husbandry", {storage = newStorage({[FillType.MANURE] = 5000})}, "cowBarn"))
+post(10, UWMListing.KIND.OFFER, FillType.MANURE, 4000, 10)
+offer = lastListing()
+M:handleRequest(A.TRADE_LISTING, 20, {listingId = offer.id, liters = 1000})
+ok, key = M:handleRequest(A.WITHDRAW_LISTING, 20, {listingId = offer.id})
+check("only the poster withdraws", not ok and key == "uwm_error_notYourListing", key)
+ok, key = M:handleRequest(A.WITHDRAW_LISTING, 10, {listingId = offer.id})
+check("withdrawn: 3000 freed, the 1000 sold stays reserved", ok and offer.state == UWMListing.STATE.CANCELLED
+    and near(M:getReservedLiters(1, FillType.MANURE), 1000) and last().state == UWMInvoice.STATE.ACTIVE, key)
+ok, key = M:handleRequest(A.DELETE_LISTING, 10, {listingId = offer.id})
+check("finished offer deleted from history", ok and M:getListing(offer.id) == nil, key)
+
+-- 25. standing WANTED order: farm 2 wants 1,000,000 l of slurry; money held up front; sellers paid from it
+reset()
+farms[2].money = 5000
+ok, key = post(20, UWMListing.KIND.WANTED, FillType.LIQUIDMANURE, 1000000, 10)
+check("wanted: can't post without the money for all of it", not ok and key == "uwm_error_listingNoMoney", key)
+farms[2].money = 20000
+ok, key = post(20, UWMListing.KIND.WANTED, FillType.LIQUIDMANURE, 1000000, 10)
+local wanted = lastListing()
+check("wanted posted: 10,000 held from the poster", ok and near(farms[2].money, 10000) and near(wanted:getHeldMoney(), 10000), key)
+local pit1 = add(newPlaceable(1, "spec_husbandry", {storage = newStorage({[FillType.LIQUIDMANURE] = 300000})}))
+add(newPlaceable(3, "spec_husbandry", {storage = newStorage({[FillType.LIQUIDMANURE] = 900000})}))
+ok, key = M:handleRequest(A.TRADE_LISTING, 10, {listingId = wanted.id, liters = 400000})
+check("a seller can't sell more than it has", not ok and key == "uwm_error_listingNoStock" and near(wanted.remaining, 1000000), key)
+ok, key = M:handleRequest(A.TRADE_LISTING, 10, {listingId = wanted.id, liters = 300000})
+inv = last()
+check("farm 1 sells 300,000: paid 3,000 from the held money", ok and near(farms[1].money, 13000) and near(farms[2].money, 10000), key)
+check("deal invoice: prepaid, reserved for farm 2 to collect", inv.prepaid and inv.reserve and inv.buyerFarmId == 2
+    and near(inv.owedLiters, 300000) and near(M:getReservedLiters(1, FillType.LIQUIDMANURE), 300000))
+ok, key = M:handleRequest(A.TRADE_LISTING, 30, {listingId = wanted.id, liters = 700000})
+check("farm 3 fills the rest: order complete, 7,000 paid", ok and wanted.state == UWMListing.STATE.DONE and near(farms[3].money, 17000)
+    and near(farms[2].money, 10000), key)
+local completeTold = false
+for _, n in ipairs(notifications) do completeTold = completeTold or n == "2:uwm_notify_listingComplete" end
+check("the poster is told it's complete", completeTold, table.concat(notifications, " "))
+M:handleRequest(A.CANCEL, 20, {invoiceId = inv.id})
+check("ending a prepaid deal refunds the uncollected liters to the poster", near(farms[2].money, 13000) and near(farms[1].money, 10000))
+
+-- 26. wanted order withdrawn half-way: the held money for the rest comes back
+reset()
+post(20, UWMListing.KIND.WANTED, FillType.MANURE, 10000, 100)
+wanted = lastListing()
+add(newPlaceable(3, "spec_manureHeap", {manureHeap = newStorage({[FillType.MANURE] = 4000})}))
+M:handleRequest(A.TRADE_LISTING, 30, {listingId = wanted.id, liters = 4000})
+check("4000 sold for 400", near(farms[3].money, 10400) and near(farms[2].money, 9000) and near(wanted.remaining, 6000))
+ok, key = M:handleRequest(A.WITHDRAW_LISTING, 20, {listingId = wanted.id})
+check("withdrawn: 600 held comes back", ok and near(farms[2].money, 9600) and near(wanted:getHeldMoney(), 0), key)
+
+-- 27. electricity both ways: offer into the buyer's productions, wanted order into the poster's
+reset()
+add(newPlaceable(1, "spec_productionPoint", {productionPoint = {storage = newStorage({[FillType.ELECTRICCHARGE] = 10000}), outputFillTypeIds = {[FillType.ELECTRICCHARGE] = true}, inputFillTypeIds = {}}}, "bga1"))
+bakery = add(newPlaceable(2, "spec_productionPoint", {productionPoint = {storage = newStorage({[FillType.ELECTRICCHARGE] = 0}, 3000), inputFillTypeIds = {[FillType.ELECTRICCHARGE] = true}, outputFillTypeIds = {}}}, "Bakery"))
+post(10, UWMListing.KIND.OFFER, FillType.ELECTRICCHARGE, 8000, 100)
+offer = lastListing()
+ok, key = M:handleRequest(A.TRADE_LISTING, 20, {listingId = offer.id, liters = 5000, targets = {bakery.uid}})
+check("power offer: only 3000 fit, 300 paid, 5000 left", ok and near(farms[2].money, 9700)
+    and near(offer.remaining, 5000) and last().state == UWMInvoice.STATE.DONE, key)
+bakery.spec_productionPoint.productionPoint.storage.fillLevels[FillType.ELECTRICCHARGE] = 0
+ok, key = post(20, UWMListing.KIND.WANTED, FillType.ELECTRICCHARGE, 3000, 100, {bakery.uid})
+wanted = lastListing()
+ok, key = M:handleRequest(A.TRADE_LISTING, 10, {listingId = wanted.id, liters = 3000})
+check("7000 kWh left, 5000 held by its own offer: can't sell 3000", not ok and key == "uwm_error_listingNoStock", key)
+M:handleRequest(A.WITHDRAW_LISTING, 10, {listingId = offer.id})
+ok, key = M:handleRequest(A.TRADE_LISTING, 10, {listingId = wanted.id, liters = 3000})
+check("after withdrawing: 3000 kWh delivered, paid from the held 300", ok and wanted.state == UWMListing.STATE.DONE
+    and near(bakery.spec_productionPoint.productionPoint.storage:getFillLevel(FillType.ELECTRICCHARGE), 3000) and near(farms[1].money, 10600), key)
+
+-- 28. standing orders travel to clients and into the savegame
+reset()
+add(newPlaceable(1, "spec_silo", {storages = {newStorage({[FillType.MANURE] = 9000})}}))
+post(10, UWMListing.KIND.OFFER, FillType.MANURE, 9000, 12)
+M:handleRequest(A.TRADE_LISTING, 20, {listingId = lastListing().id, liters = 1000})
+stream = {}
+M:writeStream(0)
+copy = UWMManager.new(false); copy:readStream(0)
+check("listing streams to clients", #stream == 0 and #copy.listings == 1 and near(copy.listings[1].remaining, 8000)
+    and copy.invoices[1].listingId == copy.listings[1].id)
+M:saveToXMLFile("save/listings.xml"); loaded = UWMManager.new(true); loaded:loadFromXMLFile("save/listings.xml")
+check("listing saved and loaded, still holding stock", #loaded.listings == 1 and loaded.listings[1].trades == 1
+    and near(loaded:getReservedLiters(1, FillType.MANURE), 9000) and loaded.nextListingId == M.nextListingId)
+stream = {}
+local req = UWMRequestEvent.new(A.TRADE_LISTING, {listingId = 5, liters = 1234})
+req:writeStream(0, nil)
+local back = UWMRequestEvent.emptyNew()
+back.run = function() end
+back:readStream(0, nil)
+check("trade request travels: listing id + amount", back.data.listingId == 5 and near(back.data.liters, 1234) and #stream == 0)
+
+-- 29. the tabbed page: what goes in which tab, row texts, and which buttons each selection gets
+reset()
+add(newPlaceable(1, "spec_husbandry", {storage = newStorage({[FillType.LIQUIDMANURE] = 500000, [FillType.MANURE] = 0})}))
+add(newPlaceable(2, "spec_manureHeap", {manureHeap = newStorage({[FillType.MANURE] = 9000})}))
+order(20, 1, 2, FillType.LIQUIDMANURE, UWMInvoice.AMOUNT.FIXED, 10000, 33)      -- farm 2 orders from farm 1
+local pendingOrder = last()
+order(10, 1, 2, FillType.LIQUIDMANURE, UWMInvoice.AMOUNT.FIXED, 2000, 10)       -- farm 1 bills farm 2
+local bill = last()
+post(10, UWMListing.KIND.OFFER, FillType.LIQUIDMANURE, 400000, 10)
+offer = lastListing()
+post(20, UWMListing.KIND.WANTED, FillType.MANURE, 1000, 5)
+wanted = lastListing()
+M:handleRequest(A.TRADE_LISTING, 20, {listingId = offer.id, liters = 50000})
+local deal = last()
+local L1 = UWMFrame.buildLists(M, 1)
+local L2 = UWMFrame.buildLists(M, 2)
+check("farm 1 INCOMING = the order from farm 2", #L1.incoming == 1 and L1.incoming[1] == pendingOrder)
+check("farm 1 OUTGOING = its bill", #L1.outgoing == 1 and L1.outgoing[1] == bill)
+check("farm 2 sees them the other way round", L2.incoming[1] == bill and L2.outgoing[1] == pendingOrder)
+check("MARKET shows other farms' open orders only", #L1.market == 1 and L1.market[1] == wanted and #L2.market == 1 and L2.market[1] == offer)
+check("MY ORDERS = own standing orders", #L1.myOrders == 1 and L1.myOrders[1] == offer and L2.myOrders[1] == wanted)
+check("deals go to MY DEALS (both farms), not to incoming/outgoing", L1.myDeals[1] == deal and L2.myDeals[1] == deal
+    and #L2.openDeals == 1)
+local row, colorIndex, color = UWMFrame.getInvoiceRow(pendingOrder, 1)
+check("invoice row: number, farm, description, status, amount", row[1] == "UWM-001" and row[3] == "Farm2"
+    and row[4] == "Slurry, 10000 (you sell)" and row[6] == "Waiting for you" and row[7] == "330" and colorIndex == 6
+    and color == UWMFrame.COLOR_WARN, table.concat(row, " | "))
+row = UWMFrame.getMarketRow(offer)
+check("market row: farm, for sale, left / of, price, held stock", row[1] == "Farm1" and row[2] == "For sale" and row[4] == "350000"
+    and row[5] == "400000" and row[6] == "10 / 1,000 l" and row[7] == "Stock", table.concat(row, " | "))
+row = UWMFrame.getOrderRow(wanted)
+check("my order row: SO number, wanted, status open", row[1] == "SO-002" and row[2] == "Wanted" and row[8] == "Open", table.concat(row, " | "))
+row = UWMFrame.getOpenDealRow(deal, 1)
+check("open deal row for the seller: the buyer collects", row[1] == "Farm2" and row[5] == "50000 (buyer)", table.concat(row, " | "))
+local function acts(item, farmId, manager) local a, b = UWMFrame.getActions(item, farmId, manager ~= false) return (a or "") .. "," .. (b or "") end
+check("incoming bill: Accept and pay / Decline", acts(bill, 2) == "uwm_button_acceptPay,uwm_button_decline", acts(bill, 2))
+check("incoming order: Accept / Decline", acts(pendingOrder, 1) == "uwm_button_accept,uwm_button_decline")
+check("sent, waiting: Withdraw only", acts(bill, 1) == ",uwm_button_withdraw")
+check("running deal: End", acts(deal, 2) == ",uwm_button_end")
+check("other farm's offer: Buy; wanted: Sell to them", acts(offer, 2) == "uwm_button_buy," and acts(wanted, 1) == "uwm_button_sellTo,")
+check("own open order: Withdraw", acts(offer, 1) == ",uwm_button_withdraw")
+check("not the farm manager: no trade buttons", acts(offer, 2, false) == ",")
+M:handleRequest(A.WITHDRAW_LISTING, 10, {listingId = offer.id})
+check("own finished order: Delete", acts(offer, 1) == ",uwm_button_delete")
+check("finished count for Clear history", UWMFrame.getFinishedCount(M, 1) == 1)
+details = UWMFrame.getListingDetailsText(wanted, 2)
+check("standing order details", contains(details, "Standing order SO-002") and contains(details, "Wanted by: Farm2")
+    and contains(details, "Money held for the rest: 5"), details)
+details = UWMFrame.getDetailsText(deal, 2)
+check("deal details say which standing order", contains(details, "From standing order SO-001"), details)
 
 print(string.format("%d passed, %d failed", passed, failed))
 return failed

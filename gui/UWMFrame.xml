@@ -1,93 +1,259 @@
 <?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<!-- Utilities page (0.5): tabs INCOMING / OUTGOING / STANDING ORDERS, the last with sub-tabs MARKET / MY ORDERS /
+     MY DEALS (user's layout, mock-up previews/menu_v1_*.png). Which parts show is switched in UWMFrame.lua.
+     Geometry (2026-10-24): the tab container's content is inset 63px, so tables start at x -63px and run 1580px
+     wide; column headings 14px into their box, line under them at -48, list from -50, bottom line at -723. Sub-tabs at
+     -45 with their line at -102, the tables under them start at -112. Depot status + manager line: footer under -723. -->
 <GUI name="UWMFrame">
     <GuiElement profile="fs25_menuContainer">
-        <GuiElement profile="fs25_menuHeaderPanel">
-            <Text profile="uwm_headerText" text="$l10n_uwm_menuTitle"/>
-            <Text profile="uwm_managerText" id="managerText"/>
+        <GuiElement profile="fs25_menuHeaderPanel" position="-62px 92px">
+            <Bitmap profile="fs25_menuHeaderIconBg">
+                <Bitmap profile="fs25_menuHeaderIcon" id="headerIcon"/>
+            </Bitmap>
+            <Text profile="fs25_menuHeaderTitle" text="$l10n_uwm_menuTitle"/>
+            <RoundCorner profile="fs25_shopMoneyBoxBg"/>
+            <BoxLayout profile="fs25_shopMoneyBox">
+                <Text profile="fs25_shopBalance" text="$l10n_uwm_balance"/>
+                <Text profile="fs25_shopMoney" id="balanceText"/>
+            </BoxLayout>
         </GuiElement>
 
-        <GuiElement profile="fs25_statisticsHeaderBox">
-            <Text profile="uwm_headerCell" position="0px 0px"    size="180px 20px" text="$l10n_uwm_column_good"/>
-            <Text profile="uwm_headerCell" position="180px 0px"  size="250px 20px" text="$l10n_uwm_column_farm"/>
-            <Text profile="uwm_headerCell" position="430px 0px"  size="150px 20px" text="$l10n_uwm_column_role"/>
-            <Text profile="uwm_headerCell" position="580px 0px"  size="260px 20px" text="$l10n_uwm_column_amount"/>
-            <Text profile="uwm_headerCell" position="840px 0px"  size="220px 20px" text="$l10n_uwm_column_price"/>
-            <Text profile="uwm_headerCell" position="1060px 0px" size="140px 20px" text="$l10n_uwm_column_repeat"/>
-            <Text profile="uwm_headerCellLeft" position="1200px 0px" size="320px 20px" text="$l10n_uwm_column_status"/>
-            <ThreePartBitmap profile="fs25_lineSeparatorBottom" position="0px -2dp"/>
+        <!-- main tabs -->
+        <BoxLayout profile="fs25_subCategorySelectorTabbedBox">
+            <Button profile="fs25_subCategorySelectorTabbedTab" id="mainTabs[1]" text="$l10n_uwm_tab_incoming" onClick="onClickTabIncoming">
+                <ThreePartBitmap profile="fs25_subCategorySelectorTabbedTabBg" name="background"/>
+            </Button>
+            <Button profile="fs25_subCategorySelectorTabbedTab" id="mainTabs[2]" text="$l10n_uwm_tab_outgoing" onClick="onClickTabOutgoing">
+                <ThreePartBitmap profile="fs25_subCategorySelectorTabbedTabBg" name="background"/>
+            </Button>
+            <Button profile="fs25_subCategorySelectorTabbedTab" id="mainTabs[3]" text="$l10n_uwm_tab_board" onClick="onClickTabBoard">
+                <ThreePartBitmap profile="fs25_subCategorySelectorTabbedTabBg" name="background"/>
+            </Button>
+        </BoxLayout>
+        <ThreePartBitmap profile="fs25_lineSeparatorTopHighlighted" position="-63px -57px" size="100% 2dp"/>
+        <MultiTextOption profile="fs25_subCategorySelectorTabbed" id="mainPaging" position="0px -10px" onClick="onClickMainPaging"/>
+
+        <GuiElement profile="fs25_subCategorySelectorTabbedContainer">
+
+            <!-- INCOMING / OUTGOING: invoices -->
+            <GuiElement profile="fs25_statisticsHeaderBox" position="-63px 0px" id="invoiceHeader">
+                <Text profile="uwm_headerCell" position="20px -14px"   size="120px 32px" text="$l10n_uwm_column_number"/>
+                <Text profile="uwm_headerCell" position="150px -14px"  size="130px 32px" text="$l10n_uwm_column_day"/>
+                <Text profile="uwm_headerCell" position="290px -14px"  size="300px 32px" text="$l10n_uwm_column_farm"/>
+                <Text profile="uwm_headerCell" position="600px -14px"  size="380px 32px" text="$l10n_uwm_column_description"/>
+                <Text profile="uwm_headerCell" position="990px -14px"  size="150px 32px" text="$l10n_uwm_column_repeat"/>
+                <Text profile="uwm_headerCell" position="1150px -14px" size="240px 32px" text="$l10n_uwm_column_status"/>
+                <Text profile="uwm_headerCell" position="1400px -14px" size="150px 32px" text="$l10n_uwm_column_amount"/>
+            </GuiElement>
+            <ThreePartBitmap profile="fs25_lineSeparatorTop" position="-63px -48px" size="100% 1dp" id="invoiceHeaderLine"/>
+            <SmoothList profile="uwm_list" id="invoiceList" position="-63px -50px" size="100% 672px">
+                <ListItem profile="uwm_listItem">
+                    <ThreePartBitmap profile="uwm_listItemBg" name="alternating"/>
+                    <Text profile="uwm_rowCell" position="20px 0px"   size="120px 32px" name="c1"/>
+                    <Text profile="uwm_rowCell" position="150px 0px"  size="130px 32px" name="c2"/>
+                    <Text profile="uwm_rowCell" position="290px 0px"  size="300px 32px" name="c3"/>
+                    <Text profile="uwm_rowCellDim" position="600px 0px"  size="380px 32px" name="c4"/>
+                    <Text profile="uwm_rowCell" position="990px 0px"  size="150px 32px" name="c5"/>
+                    <Text profile="uwm_rowCellBold" position="1150px 0px" size="240px 32px" name="c6"/>
+                    <Text profile="uwm_rowCellBold" position="1400px 0px" size="150px 32px" name="c7"/>
+                </ListItem>
+            </SmoothList>
+            <Text profile="uwm_emptyText" position="540px -350px" id="invoiceEmpty"/>
+
+            <!-- STANDING ORDERS: sub-tabs -->
+            <BoxLayout profile="fs25_subCategorySelectorTabbedBox" id="boardTabBox" position="-63px -45px" size="1580px 57px">
+                <Button profile="fs25_subCategorySelectorTabbedTab" id="boardTabs[1]" text="$l10n_uwm_tab_market" onClick="onClickTabMarket">
+                    <ThreePartBitmap profile="fs25_subCategorySelectorTabbedTabBg" name="background"/>
+                </Button>
+                <Button profile="fs25_subCategorySelectorTabbedTab" id="boardTabs[2]" text="$l10n_uwm_tab_myOrders" onClick="onClickTabMyOrders">
+                    <ThreePartBitmap profile="fs25_subCategorySelectorTabbedTabBg" name="background"/>
+                </Button>
+                <Button profile="fs25_subCategorySelectorTabbedTab" id="boardTabs[3]" text="$l10n_uwm_tab_myDeals" onClick="onClickTabMyDeals">
+                    <ThreePartBitmap profile="fs25_subCategorySelectorTabbedTabBg" name="background"/>
+                </Button>
+            </BoxLayout>
+            <ThreePartBitmap profile="fs25_lineSeparatorTopHighlighted" position="-63px -102px" size="100% 2dp" id="boardTabLine"/>
+            <MultiTextOption profile="fs25_subCategorySelectorTabbed" id="boardPaging" position="-63px -55px" onClick="onClickBoardPaging"/>
+
+            <!-- MARKET: other farms' open standing orders -->
+            <GuiElement profile="fs25_statisticsHeaderBox" position="-63px -112px" id="marketHeader">
+                <Text profile="uwm_headerCell" position="20px -14px"   size="290px 32px" text="$l10n_uwm_column_farm"/>
+                <Text profile="uwm_headerCell" position="320px -14px"  size="150px 32px" text="$l10n_uwm_column_type"/>
+                <Text profile="uwm_headerCell" position="480px -14px"  size="180px 32px" text="$l10n_uwm_column_product"/>
+                <Text profile="uwm_headerCell" position="670px -14px"  size="210px 32px" text="$l10n_uwm_column_left"/>
+                <Text profile="uwm_headerCell" position="890px -14px"  size="210px 32px" text="$l10n_uwm_column_of"/>
+                <Text profile="uwm_headerCell" position="1110px -14px" size="280px 32px" text="$l10n_uwm_column_price"/>
+                <Text profile="uwm_headerCell" position="1400px -14px" size="150px 32px" text="$l10n_uwm_column_held"/>
+            </GuiElement>
+            <ThreePartBitmap profile="fs25_lineSeparatorTop" position="-63px -160px" size="100% 1dp" id="marketHeaderLine"/>
+            <SmoothList profile="uwm_list" id="marketList" position="-63px -162px" size="100% 318px">
+                <ListItem profile="uwm_listItem">
+                    <ThreePartBitmap profile="uwm_listItemBg" name="alternating"/>
+                    <Text profile="uwm_rowCell" position="20px 0px"   size="290px 32px" name="c1"/>
+                    <Text profile="uwm_rowCellBold" position="320px 0px"  size="150px 32px" name="c2"/>
+                    <Text profile="uwm_rowCell" position="480px 0px"  size="180px 32px" name="c3"/>
+                    <Text profile="uwm_rowCellBold" position="670px 0px"  size="210px 32px" name="c4"/>
+                    <Text profile="uwm_rowCell" position="890px 0px"  size="210px 32px" name="c5"/>
+                    <Text profile="uwm_rowCellBold" position="1110px 0px" size="280px 32px" name="c6"/>
+                    <Text profile="uwm_rowCell" position="1400px 0px" size="150px 32px" name="c7"/>
+                </ListItem>
+            </SmoothList>
+            <Text profile="uwm_emptyText" position="540px -300px" id="marketEmpty"/>
+
+            <!-- MARKET, lower panel: your open deals -->
+            <GuiElement profile="fs25_statisticsHeaderBox" position="-63px -494px" size="1580px 102px" id="dealsHeader">
+                <ThreePartBitmap profile="fs25_lineSeparatorTopHighlighted" position="0px 0px" size="100% 2dp"/>
+                <Text profile="uwm_sectionTitle" position="20px -10px" size="1200px 32px" text="$l10n_uwm_dealsTitle"/>
+                <ThreePartBitmap profile="fs25_lineSeparatorTop" position="0px -52px" size="100% 1dp"/>
+                <Text profile="uwm_headerCell" position="20px -66px"   size="420px 32px" text="$l10n_uwm_column_farm"/>
+                <Text profile="uwm_headerCell" position="450px -66px"  size="250px 32px" text="$l10n_uwm_column_product"/>
+                <Text profile="uwm_headerCell" position="710px -66px"  size="280px 32px" text="$l10n_uwm_column_volume"/>
+                <Text profile="uwm_headerCell" position="1000px -66px" size="250px 32px" text="$l10n_uwm_column_amount"/>
+                <Text profile="uwm_headerCell" position="1260px -66px" size="290px 32px" text="$l10n_uwm_column_toCollect"/>
+                <ThreePartBitmap profile="fs25_lineSeparatorTop" position="0px -100px" size="100% 1dp"/>
+            </GuiElement>
+            <SmoothList profile="uwm_list" id="dealsList" position="-63px -596px" size="100% 126px">
+                <ListItem profile="uwm_listItem">
+                    <ThreePartBitmap profile="uwm_listItemBg" name="alternating"/>
+                    <Text profile="uwm_rowCell" position="20px 0px"   size="420px 32px" name="c1"/>
+                    <Text profile="uwm_rowCell" position="450px 0px"  size="250px 32px" name="c2"/>
+                    <Text profile="uwm_rowCellBold" position="710px 0px"  size="280px 32px" name="c3"/>
+                    <Text profile="uwm_rowCellBold" position="1000px 0px" size="250px 32px" name="c4"/>
+                    <Text profile="uwm_rowCell" position="1260px 0px" size="290px 32px" name="c5"/>
+                </ListItem>
+            </SmoothList>
+            <Text profile="uwm_emptyText" position="540px -640px" id="dealsEmpty"/>
+
+            <!-- MY ORDERS / MY DEALS: one list, the column titles change with the sub-tab -->
+            <GuiElement profile="fs25_statisticsHeaderBox" position="-63px -112px" id="boardHeader">
+                <Text profile="uwm_headerCell" position="20px -14px"   size="140px 32px" id="boardColumns[1]"/>
+                <Text profile="uwm_headerCell" position="170px -14px"  size="150px 32px" id="boardColumns[2]"/>
+                <Text profile="uwm_headerCell" position="330px -14px"  size="240px 32px" id="boardColumns[3]"/>
+                <Text profile="uwm_headerCell" position="580px -14px"  size="190px 32px" id="boardColumns[4]"/>
+                <Text profile="uwm_headerCell" position="780px -14px"  size="190px 32px" id="boardColumns[5]"/>
+                <Text profile="uwm_headerCell" position="980px -14px"  size="170px 32px" id="boardColumns[6]"/>
+                <Text profile="uwm_headerCell" position="1160px -14px" size="190px 32px" id="boardColumns[7]"/>
+                <Text profile="uwm_headerCell" position="1360px -14px" size="190px 32px" id="boardColumns[8]"/>
+            </GuiElement>
+            <ThreePartBitmap profile="fs25_lineSeparatorTop" position="-63px -160px" size="100% 1dp" id="boardHeaderLine"/>
+            <SmoothList profile="uwm_list" id="boardList" position="-63px -162px" size="100% 560px">
+                <ListItem profile="uwm_listItem">
+                    <ThreePartBitmap profile="uwm_listItemBg" name="alternating"/>
+                    <Text profile="uwm_rowCell" position="20px 0px"   size="140px 32px" name="c1"/>
+                    <Text profile="uwm_rowCell" position="170px 0px"  size="150px 32px" name="c2"/>
+                    <Text profile="uwm_rowCell" position="330px 0px"  size="240px 32px" name="c3"/>
+                    <Text profile="uwm_rowCell" position="580px 0px"  size="190px 32px" name="c4"/>
+                    <Text profile="uwm_rowCell" position="780px 0px"  size="190px 32px" name="c5"/>
+                    <Text profile="uwm_rowCell" position="980px 0px"  size="170px 32px" name="c6"/>
+                    <Text profile="uwm_rowCellBold" position="1160px 0px" size="190px 32px" name="c7"/>
+                    <Text profile="uwm_rowCellBold" position="1360px 0px" size="190px 32px" name="c8"/>
+                </ListItem>
+            </SmoothList>
+            <Text profile="uwm_emptyText" position="540px -400px" id="boardEmpty"/>
+
+            <!-- bottom line + footer: depot status (left), farm manager or not (right) -->
+            <ThreePartBitmap profile="fs25_lineSeparatorTop" position="-63px -723px" size="100% 1dp"/>
+            <Text profile="uwm_footerText" position="-43px -733px" id="depotText"/>
+            <Text profile="uwm_footerTextRight" position="887px -733px" id="managerText"/>
         </GuiElement>
 
-        <SmoothList profile="uwm_list" id="invoiceList" listSectionHeader="section">
-            <ListItem profile="uwm_listItem" name="invoiceRow">
-                <Text profile="uwm_rowCell" position="0px 0px"    size="180px 20px" name="good"/>
-                <Text profile="uwm_rowCell" position="180px 0px"  size="250px 20px" name="farm"/>
-                <Text profile="uwm_rowCell" position="430px 0px"  size="150px 20px" name="role"/>
-                <Text profile="uwm_rowCell" position="580px 0px"  size="260px 20px" name="amount"/>
-                <Text profile="uwm_rowCell" position="840px 0px"  size="220px 20px" name="price"/>
-                <Text profile="uwm_rowCell" position="1060px 0px" size="140px 20px" name="repeat"/>
-                <Text profile="uwm_rowCellLeft" position="1200px 0px" size="320px 20px" name="status"/>
-            </ListItem>
-            <ListItem profile="fs25_subCategoryListSectionHeader" name="section">
-                <Text profile="fs25_subCategoryListSectionHeaderTitle" name="title"/>
-            </ListItem>
-        </SmoothList>
-
-        <ThreePartBitmap profile="uwm_listSliderBox">
-            <Slider profile="fs25_listSlider" dataElementId="invoiceList"/>
+        <!-- scroll bars, docked at the right edge like the game's own lists -->
+        <ThreePartBitmap profile="uwm_sliderDockedBg" id="invoiceSlider">
+            <ThreePartBitmap profile="fs25_sliderDockedBox">
+                <Slider profile="uwm_sliderDocked" dataElementId="invoiceList"/>
+            </ThreePartBitmap>
+        </ThreePartBitmap>
+        <ThreePartBitmap profile="uwm_sliderDockedBg" id="boardSlider" visible="false">
+            <ThreePartBitmap profile="fs25_sliderDockedBox">
+                <Slider profile="uwm_sliderDocked" dataElementId="boardList"/>
+            </ThreePartBitmap>
         </ThreePartBitmap>
     </GuiElement>
 
     <GUIProfiles>
-        <Profile name="uwm_headerText" extends="fs25_textDefault">
-            <size value="900px 64px"/>
-            <position value="0px 0px"/>
-            <textSize value="31px"/>
-            <textBold value="false"/>
-            <textUpperCase value="true"/>
+        <Profile name="uwm_list" extends="emptyPanel" with="pivotTopLeft">
+            <size value="100% 672px"/>
         </Profile>
 
-        <Profile name="uwm_managerText" extends="fs25_textDefault" with="anchorMiddleRight">
-            <size value="700px 64px"/>
-            <position value="-20px 0px"/>
+        <Profile name="uwm_listItem" extends="fs25_calendarListItem">
+            <height value="32px"/>
+            <imageSelectedColor value="$preset_fs25_colorMainHighlight"/>
+        </Profile>
+
+        <!-- row background: alternating stripes, green bar with soft ends when selected -->
+        <Profile name="uwm_listItemBg" extends="fs25_calendarListItemBg">
+            <imageSelectedColor value="$preset_fs25_colorMainHighlight"/>
+            <startImageSelectedColor value="$preset_fs25_colorMainHighlight"/>
+            <endImageSelectedColor value="$preset_fs25_colorMainHighlight"/>
+        </Profile>
+
+        <Profile name="uwm_headerCell" extends="baseReference" with="anchorTopLeft">
+            <imageColor value="$preset_colorTransparent"/>
+            <textSize value="16px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textColor value="$preset_colorWhite_50"/>
+            <textAlignment value="center"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+
+        <Profile name="uwm_rowCell" extends="baseReference" with="anchorStretchingYLeft">
+            <textBold value="false"/>
+            <textSize value="15px"/>
+            <textAlignment value="center"/>
+            <textVerticalAlignment value="middle"/>
+            <textColor value="$preset_fs25_colorMainLight"/>
+            <textSelectedColor value="$preset_fs25_colorMainDark"/>
+            <textDisabledColor value="$preset_colorDisabled"/>
+        </Profile>
+
+        <Profile name="uwm_rowCellBold" extends="uwm_rowCell">
+            <textBold value="true"/>
+        </Profile>
+
+        <!-- long texts scroll instead of being cut off -->
+        <Profile name="uwm_rowCellDim" extends="uwm_rowCell">
+            <textSize value="14px"/>
+            <textLayoutMode value="scrolling"/>
+        </Profile>
+
+        <Profile name="uwm_sectionTitle" extends="baseReference" with="anchorTopLeft">
             <textSize value="18px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textColor value="$preset_fs25_colorMainLight"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+
+        <!-- "nothing here" line, centered over the list -->
+        <Profile name="uwm_emptyText" extends="baseReference" with="anchorTopLeft">
+            <size value="400px 40px"/>
+            <textSize value="18px"/>
+            <textBold value="false"/>
+            <textColor value="$preset_fs25_colorGreyText"/>
+            <textAlignment value="center"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+
+        <Profile name="uwm_footerText" extends="baseReference" with="anchorTopLeft">
+            <size value="900px 30px"/>
+            <textSize value="16px"/>
+            <textColor value="$preset_fs25_colorGreyText"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+
+        <Profile name="uwm_footerTextRight" extends="uwm_footerText">
+            <size value="600px 30px"/>
             <textAlignment value="right"/>
         </Profile>
 
-        <Profile name="uwm_list" extends="emptyPanel" with="anchorStretchingYLeft pivotTopLeft">
-            <position value="0px -40px"/>
-        </Profile>
-
-        <Profile name="uwm_listItem" extends="baseReference" with="anchorTopStretchingX alternating">
-            <height value="32px"/>
-            <imageColor value="$preset_fs25_colorGrey"/>
-            <imageSelectedColor value="$preset_fs25_colorMainHighlight"/>
-            <alternateBackgroundColor value="$preset_fs25_colorGreyDark_50"/>
-        </Profile>
-
-        <Profile name="uwm_listSliderBox" extends="fs25_listSliderBox" with="anchorTopRight">
-            <position value="28px -40px"/>
-            <size value="6px 710px"/>
-        </Profile>
-
-        <Profile name="uwm_headerCell" extends="fs25_textDarkHighlight" with="anchorStretchingYLeft">
-            <textSize value="15px"/>
-            <textBold value="true"/>
-            <textUpperCase value="true"/>
-            <textAlignment value="center"/>
-        </Profile>
-
-        <Profile name="uwm_headerCellLeft" extends="uwm_headerCell">
-            <textAlignment value="left"/>
-        </Profile>
-
-        <Profile name="uwm_rowCell" extends="fs25_textDarkHighlight" with="anchorStretchingYLeft">
-            <textSize value="16px"/>
-            <textBold value="false"/>
-            <textAlignment value="center"/>
-        </Profile>
-
-        <Profile name="uwm_rowCellLeft" extends="uwm_rowCell">
-            <textAlignment value="left"/>
+        <Profile name="uwm_sliderDockedBg" extends="fs25_sliderDockedBg" with="anchorTopRight"/>
+        <Profile name="uwm_sliderDocked" extends="fs25_helpLineSlider">
+            <startImageColor value="$preset_fs25_colorMainHighlight"/>
+            <sliderImageColor value="$preset_fs25_colorMainHighlight"/>
+            <endImageColor value="$preset_fs25_colorMainHighlight"/>
         </Profile>
     </GUIProfiles>
 </GUI>

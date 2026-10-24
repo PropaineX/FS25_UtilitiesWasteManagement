@@ -2,6 +2,8 @@
 -- dialogs (choose from a list, type a number, yes/no).
 -- New invoice: sell or buy -> other farm -> good -> amount -> price -> one-off / daily / weekly
 --   -> buyer's choices (reserve, or the productions that get the electricity) -> confirm.
+-- New standing order: offer (sell) or wanted (buy) -> good -> total amount -> price -> (wanted electricity: the
+--   productions that get it) -> confirm. Trading on one: amount -> (buying electricity: productions) -> confirm.
 -- Author: PropaineX
 
 UWMWizard = {}
@@ -32,6 +34,19 @@ function UWMWizard.startNew()
     wizard:askSide()
 end
 
+function UWMWizard.startListing()
+    local wizard = UWMWizard.new()
+    wizard:askListingKind()
+end
+
+-- buy from another farm's offer, or sell to its wanted order
+function UWMWizard.startTrade(listing)
+    local wizard = UWMWizard.new()
+    wizard.tradeListing = listing
+    wizard.invoice.fillTypeIndex = listing.fillTypeIndex
+    wizard:askTradeAmount()
+end
+
 function UWMWizard.startAccept(invoice)
     local wizard = UWMWizard.new()
     wizard.acceptInvoice = invoice
@@ -57,6 +72,17 @@ function UWMWizard:askSide()
             self:askFarm()
         end
     end, getText("uwm_wizard_title"), getText("uwm_wizard_side"), options)
+end
+
+function UWMWizard:askListingKind()
+    local kinds = {UWMListing.KIND.OFFER, UWMListing.KIND.WANTED}
+    local options = {getText("uwm_wizard_kindOffer"), getText("uwm_wizard_kindWanted")}
+    OptionDialog.show(function(index)
+        if kinds[index] ~= nil then
+            self.listingKind = kinds[index]
+            self:askGood()
+        end
+    end, getText("uwm_wizard_listingTitle"), getText("uwm_wizard_kind"), options)
 end
 
 function UWMWizard:askFarm()
@@ -95,7 +121,11 @@ function UWMWizard:askGood()
     OptionDialog.show(function(index)
         if goods[index] ~= nil then
             self.invoice.fillTypeIndex = goods[index].fillTypeIndex
-            self:askAmountMode()
+            if self.listingKind ~= nil then
+                self:askLiters()
+            else
+                self:askAmountMode()
+            end
         end
     end, getText("uwm_wizard_title"), getText("uwm_wizard_good"), options)
 end
@@ -122,6 +152,11 @@ local function parseNumber(text)
 end
 
 function UWMWizard:askLiters()
+    -- an offer can't be bigger than the free stock: suggest that
+    local default = ""
+    if self.listingKind == UWMListing.KIND.OFFER then
+        default = tostring(math.floor(UWMStock.getAvailable(self.farmId, self.invoice.fillTypeIndex, nil)))
+    end
     TextInputDialog.show(function(_, text, clickOk)
         if not clickOk then
             return
@@ -133,7 +168,7 @@ function UWMWizard:askLiters()
         end
         self.invoice.liters = liters
         self:askPrice()
-    end, self, "", getText(unitKey(self.invoice, "uwm_wizard_liters")), getText(unitKey(self.invoice, "uwm_wizard_liters")), 12, getText("uwm_button_next"))
+    end, self, default, getText(unitKey(self.invoice, "uwm_wizard_liters")), getText(unitKey(self.invoice, "uwm_wizard_liters")), 12, getText("uwm_button_next"))
 end
 
 -- the game's price for 1,000 liters, shown as a guide
@@ -163,7 +198,15 @@ function UWMWizard:askPrice()
             return
         end
         self.invoice.pricePer1000 = price
-        self:askRepeat()
+        if self.listingKind == nil then
+            self:askRepeat()
+        elseif self.listingKind == UWMListing.KIND.WANTED and self.invoice.fillTypeIndex == FillType.ELECTRICCHARGE then
+            self:askTargets(function()
+                self:confirmListing()
+            end)
+        else
+            self:confirmListing()
+        end
     end, self, default, prompt, getText(unitKey(self.invoice, "uwm_wizard_price")), 12, getText("uwm_button_next"))
 end
 
@@ -322,4 +365,110 @@ function UWMWizard:confirmAccept()
             UWMRequestEvent.sendRequest(UWMManager.ACTION.ACCEPT, data)
         end
     end, self, text, getText("uwm_wizard_title"))
+end
+
+
+----------------------------------------------------------------------------------------------------------------
+-- Standing orders
+----------------------------------------------------------------------------------------------------------------
+
+function UWMWizard:confirmListing()
+    local UWM = UtilitiesWasteManagement
+    local invoice = self.invoice
+    local isOffer = self.listingKind == UWMListing.KIND.OFFER
+    local lines = {
+        string.format(getText(isOffer and "uwm_summary_listingOffer" or "uwm_summary_listingWanted"), UWM.getGoodName(invoice.fillTypeIndex)),
+        string.format(getText("uwm_summary_amount"), UWM.formatAmount(invoice.fillTypeIndex, invoice.liters),
+            UWM.formatMoney(invoice:getPrice(invoice.liters))),
+        string.format(getText(unitKey(invoice, "uwm_summary_price")), UWM.formatMoney(invoice.pricePer1000))
+    }
+    if #self.targetPlaceables > 0 then
+        table.insert(lines, string.format(getText("uwm_summary_targets"), #self.targetPlaceables))
+    end
+    table.insert(lines, "")
+    table.insert(lines, getText(isOffer and "uwm_summary_listingStockHeld" or "uwm_summary_listingMoneyHeld"))
+    table.insert(lines, "")
+    table.insert(lines, getText("uwm_confirm_postListing"))
+
+    YesNoDialog.show(function(_, yes)
+        if yes then
+            local listing = UWMListing.new()
+            listing.kind = self.listingKind
+            listing.fillTypeIndex = invoice.fillTypeIndex
+            listing.liters = invoice.liters
+            listing.pricePer1000 = invoice.pricePer1000
+            UWMRequestEvent.sendRequest(UWMManager.ACTION.POST_LISTING, {listing = listing, targetPlaceables = self.targetPlaceables})
+        end
+    end, self, table.concat(lines, "\n"), getText("uwm_wizard_listingTitle"))
+end
+
+-- the most this farm can take / give on the order now
+function UWMWizard.getTradeMax(listing, farmId)
+    local most = listing.remaining
+    if not listing:getIsOffer() then
+        most = math.min(most, UWMStock.getAvailable(farmId, listing.fillTypeIndex, nil))
+    end
+    return math.max(math.floor(most), 0)
+end
+
+function UWMWizard:askTradeAmount()
+    local UWM = UtilitiesWasteManagement
+    local listing = self.tradeListing
+    local most = UWMWizard.getTradeMax(listing, self.farmId)
+    local ft = listing.fillTypeIndex
+    local prompt = string.format(getText(listing:getIsOffer() and "uwm_wizard_tradeBuy" or "uwm_wizard_tradeSell"),
+        UWM.formatAmount(ft, listing.remaining), UWMFrame.getPriceText(ft, listing.pricePer1000))
+    if not listing:getIsOffer() then
+        prompt = prompt .. "\n" .. string.format(getText("uwm_wizard_tradeYouHave"), UWM.formatAmount(ft, most))
+    end
+
+    TextInputDialog.show(function(_, text, clickOk)
+        if not clickOk then
+            return
+        end
+        local liters = parseNumber(text)
+        if liters == nil or liters <= 0 then
+            InfoDialog.show(getText("uwm_error_badAmount"))
+            return
+        end
+        if liters > listing.remaining + 0.01 then
+            InfoDialog.show(getText("uwm_error_listingTooMuch"))
+            return
+        end
+        self.invoice.liters = liters
+        if listing:getIsOffer() and listing:getIsElectricity() then
+            self:askTargets(function()
+                self:confirmTrade()
+            end)
+        else
+            self:confirmTrade()
+        end
+    end, self, tostring(most), prompt, getText("uwm_wizard_listingTitle"), 12, getText("uwm_button_next"))
+end
+
+function UWMWizard:confirmTrade()
+    local UWM = UtilitiesWasteManagement
+    local listing = self.tradeListing
+    local ft = listing.fillTypeIndex
+    local liters = self.invoice.liters
+    local isBuying = listing:getIsOffer()
+    local lines = {
+        string.format(getText(isBuying and "uwm_summary_tradeBuy" or "uwm_summary_tradeSell"), UWM.formatAmount(ft, liters),
+            UWM.getGoodName(ft), UWMManager.getFarmName(listing.farmId), UWM.formatMoney(listing:getPrice(liters))),
+        ""
+    }
+    local key
+    if listing:getIsElectricity() then
+        key = isBuying and "uwm_confirm_tradeBuyKWh" or "uwm_confirm_tradeSellKWh"
+    else
+        key = isBuying and "uwm_confirm_tradeBuy" or "uwm_confirm_tradeSell"
+    end
+    table.insert(lines, getText(key))
+
+    YesNoDialog.show(function(_, yes)
+        if yes then
+            UWMRequestEvent.sendRequest(UWMManager.ACTION.TRADE_LISTING, {listingId = listing.id, liters = liters,
+                targetPlaceables = isBuying and self.targetPlaceables or nil})
+        end
+    end, self, table.concat(lines, "\n"), getText("uwm_wizard_listingTitle"))
 end

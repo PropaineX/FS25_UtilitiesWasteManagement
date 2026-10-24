@@ -81,7 +81,7 @@ g_currentMission = {
     addIngameNotification = function() end,
 }
 g_messageCenter = {subscribe = function() end, unsubscribeAll = function() end}
-MessageType = {DAY_CHANGED = 1}
+MessageType = {DAY_CHANGED = 1, PERIOD_CHANGED = 2}
 notificationDetails = {}
 g_server = {broadcastEvent = function(_, ev) if ev.key then table.insert(notifications, ev.farmId .. ":" .. ev.key) table.insert(notificationDetails, ev.detail or "") end end}
 -- texts: the real ones from modDesc.xml (run.py fills UWM_TEXTS), else the key
@@ -111,6 +111,19 @@ function LoadingStation:addFillLevelToFillableObject(object, fillUnitIndex, ft, 
     return object:addFillUnitFillLevel(object:getActiveFarm(), fillUnitIndex, take, ft)
 end
 function newStation(placeable, storage) return setmetatable({isServer = true, owningPlaceable = placeable, storage = storage}, {__index = LoadingStation}) end
+-- the depot's fill points: a loading station with no storage of its own (fillTypes from its XML)
+function newDepotStation(placeable)
+    return setmetatable({isServer = true, uwmIsDepot = true, owningPlaceable = placeable,
+        storage = newStorage({[FillType.LIQUIDMANURE] = 0, [FillType.MANURE] = 0})}, {__index = LoadingStation})
+end
+-- a placed depot (what UWMDepot:onFinalizePlacement registers)
+function newDepot(farmId, upkeep)
+    local depot = newPlaceable(farmId, "spec_uwmDepot", {}, "Community Depot")
+    depot.getDailyUpkeep = function() return upkeep or 0 end
+    UWMDepot.placed[depot] = true
+    return depot
+end
+function removeDepots() for depot in pairs(UWMDepot.placed) do UWMDepot.placed[depot] = nil end end
 function newTanker(farmId, capacity)
     local v = {farmId = farmId, level = 0, capacity = capacity}
     v.getActiveFarm = function(self) return self.farmId end

@@ -1,7 +1,8 @@
 """Converts the depot texture sets (make_textures.py output) to DDS for the game, plus the derived maps the
 i3d uses: painted-steel colour maps pre-tinted per part (same tints as the previews), a lighter concrete for
-sills/lintels, and the yellow/black bollard stripes. DXT5 with a full mip chain (Pillow writes only the top
-level, so levels are joined under one header - the same way as the mod icon).
+sills/lintels, and the yellow/black bollard stripes. Full mip chain (Pillow writes only the top level, so levels
+are joined under one header - the same way as the mod icon). Release sizes: at most 1024 px (the textures tile
+every 1-2 m, so that is ~500 px per metre); colour and specular maps DXT1 (no alpha), normal maps DXT5.
 
 Usage: python -I make_dds.py <texSrcDir> <outTexDir>
 """
@@ -17,7 +18,7 @@ SRC, OUT = Path(sys.argv[1]), Path(sys.argv[2])
 OUT.mkdir(parents=True, exist_ok=True)
 
 
-def to_dds(image, out, max_size=2048):
+def to_dds(image, out, max_size=1024, fmt="DXT1"):
     image = image.convert("RGBA")
     if image.width > max_size:
         image = image.resize((max_size, max_size), Image.LANCZOS)
@@ -25,7 +26,7 @@ def to_dds(image, out, max_size=2048):
     while True:
         level = image if size == image.size else image.resize(size, Image.LANCZOS)
         buf = io.BytesIO()
-        level.save(buf, "DDS", pixel_format="DXT5")
+        level.save(buf, "DDS", pixel_format=fmt)
         levels.append(buf.getvalue())
         if size == (1, 1):
             break
@@ -60,8 +61,7 @@ def tinted(png, tint, size=None):
 
 count = 0
 for png in sorted(SRC.glob("uwm*.png")):
-    small = png.stem.startswith("uwmPaintedSteel")
-    to_dds(Image.open(png), OUT / (png.stem + ".dds"), 1024 if small else 2048)
+    to_dds(Image.open(png), OUT / (png.stem + ".dds"), 1024, "DXT5" if png.stem.endswith("_normal") else "DXT1")
     count += 1
 
 TINTS = {"GalvSmall": (0.72, 0.73, 0.74), "SteelDark": (0.14, 0.15, 0.15), "Frame": (0.2, 0.21, 0.21),

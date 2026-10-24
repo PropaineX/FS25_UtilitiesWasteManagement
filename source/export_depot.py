@@ -74,6 +74,9 @@ for ob in bpy.data.objects:
         ob["i3D_static"] = False
 
 depot = empty("depot", (0, 0, 0))
+# the build script sets the tank root's location last and never updates the view layer after it: without this
+# update its matrix_world is still identity and the tank lands on the depot origin (inside the Farma 400)
+bpy.context.view_layer.update()
 for name in ("office", "tank"):
     o = bpy.data.objects[name]
     mw = o.matrix_world.copy()
@@ -106,6 +109,40 @@ empty("levelAreaWidth", gp(X1, ZF), l0)
 empty("levelAreaHeight", gp(X0, ZN), l0)
 o0 = empty("tipOcclusionStart", gp(X0, ZN), areas)
 empty("tipOcclusionEnd", gp(X1, ZF), o0)
+
+# pickups and the office door (game coords). Trigger presets from GE's collisionMaskFlags.xml: FILL_TRIGGER
+# (group TRIGGER, mask FILLABLE = a trailer's exactFillRootNode) and PLAYER_TRIGGER (mask PLAYER).
+FILL_TRIGGER = {"i3D_static": True, "i3D_trigger": True, "i3D_collision": True, "i3D_nonRenderable": True,
+                "i3D_collisionFilterGroup": "0x20000000", "i3D_collisionFilterMask": "0x40000000"}
+PLAYER_TRIGGER = dict(FILL_TRIGGER, i3D_collisionFilterMask="0x100000")
+trig = empty("triggers", (0, 0, 0), depot)
+
+
+def trigger_box(name, centre, size, props):
+    """centre and size in game (x, y, z)"""
+    o = collider(name, lambda: bpy.ops.mesh.primitive_cube_add(size=1, location=gp(centre[0], centre[2], centre[1]),
+                                                               scale=(size[0], size[2], size[1])), props, trig)
+    # physics shapes get their size in the mesh, not as a node scale
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+
+
+# slurry: the tank's capped coupling (game x 9.68, y 1.3, z -15.6, facing +x); a tanker stands in the lane
+# beside it, along z, past the bollards
+trigger_box("slurryTrigger", (13.0, 1.75, -15.6), (5.0, 3.5, 14.0), FILL_TRIGGER)
+empty("slurryDischarge", gp(9.8, -15.6, 1.3), trig)
+empty("slurryMarker", gp(11.8, -15.6, 0.0), trig)
+# manure: under the Farma 400's loading pipe (its dischargeEffect sits at x 0, y 3.94, z 5.49); trailers drive
+# through along x like at the base-game silo
+trigger_box("manureTrigger", (0.0, 2.5, 5.5), (14.0, 5.0, 4.0), FILL_TRIGGER)
+empty("manureDischarge", gp(-0.012, 5.49, 3.94), trig)
+empty("manureMarker", gp(0.0, 5.1, 0.0), trig)
+# office door (door face at game x -12.1, z -8.05, opening to -x)
+trigger_box("officeTrigger", (-13.3, 1.0, -8.05), (2.0, 2.0, 2.4), PLAYER_TRIGGER)
+empty("officeMarker", gp(-13.3, -8.05, 0.0), trig)           # the shop-basket icon on the ground at the door
+empty("mapPosition", gp(0.0, -6.0, 0.0), trig)
 
 # bollard stripes: v runs up the bollard (0.4 m per yellow + black pair); tank ring bands get UVs too
 for ob in bpy.data.objects:
@@ -223,19 +260,21 @@ for m in root.find("Materials"):
 for f in list(files):
     if ":" in f.get("filename", "") and f.get("filename") not in ids:
         files.remove(f)
-# the base-game Farma 400, pulled in from the game's own files (nothing copied), at the depot origin - the same
-# way base-game buildings reference shared lights. Its loading-pipe effect must be hidden by our script at runtime.
+# an empty link node for the base-game Farma 400 at the depot origin, LAST child of depot (so 0>5). UWMDepot loads
+# $data/placeables/unia/farma/farma400/farma400.i3d into it at runtime (nothing copied). NOT a ReferenceNode: GIANTS
+# Editor resolves those, but the game loaded it with 0 children (first in-game test, 2026-10-24: no silo).
 scene_el = root.find("Scene")
 depot_tg = next(tg for tg in scene_el.iter("TransformGroup") if tg.get("name") == "depot")
 max_node = max(int(n.get("nodeId")) for n in scene_el.iter() if n.get("nodeId"))
-ET.SubElement(depot_tg, "ReferenceNode", name="farma400", referenceId=fid("$data/placeables/unia/farma/farma400/farma400.i3d"),
-              referenceRuntimeLoaded="false", nodeId=str(max_node + 1))
+ET.SubElement(depot_tg, "TransformGroup", name="farma400", nodeId=str(max_node + 1))
 tree.write(OUT, encoding="iso-8859-1", xml_declaration=True)
 print("WROTE", OUT)
 # i3dMapping paths for the placeable XML: root index ">" child indices (node elements only)
 NODE_TAGS = {"TransformGroup", "Shape", "Light", "Camera", "Dynamic", "Audio", "ReferenceNode"}
 MAPPED = {"testAreaStart", "testAreaEnd", "clearAreaStart", "clearAreaWidth", "clearAreaHeight", "levelAreaStart",
-          "levelAreaWidth", "levelAreaHeight", "tipOcclusionStart", "tipOcclusionEnd", "farma400", "office", "tank"}
+          "levelAreaWidth", "levelAreaHeight", "tipOcclusionStart", "tipOcclusionEnd", "farma400", "office", "tank",
+          "triggers", "slurryTrigger", "slurryDischarge", "slurryMarker", "manureTrigger", "manureDischarge",
+          "manureMarker", "officeTrigger", "officeMarker", "mapPosition"}
 
 
 def walk(el, prefix):

@@ -1,8 +1,9 @@
 -- Utilities & Waste Management: farms trade electricity, slurry and manure through invoices.
 -- Author: PropaineX
 --
--- Startup, savegame, sync for joining players, notifications and the finance rows. The trading rules are in
--- UWMManager, the storages in UWMStock, the ESC page in gui/UWMFrame.lua.
+-- Startup, savegame, sync for joining players, notifications and the finance rows. The trading and depot rules
+-- are in UWMManager, the storages in UWMStock, the depot building in UWMDepot (a placeable specialization), the
+-- ESC page in gui/UWMFrame.lua.
 
 UtilitiesWasteManagement = {}
 local UWM = UtilitiesWasteManagement
@@ -31,6 +32,8 @@ local function registerFinanceStat(statName)
 end
 registerFinanceStat("uwmIncome")
 registerFinanceStat("uwmExpense")
+registerFinanceStat("uwmDepotIncome")
+registerFinanceStat("uwmDepotExpense")
 
 function UWM.getText(key)
     return g_i18n:getText(key, UWM.modName)
@@ -105,8 +108,14 @@ function UWM:loadMap(filename)
         MoneyType.UWM_INCOME = MoneyType.register("uwmIncome", "uwm_finance_income")
         MoneyType.UWM_EXPENSE = MoneyType.register("uwmExpense", "uwm_finance_expense")
     end
+    if MoneyType.UWM_DEPOT_INCOME == nil and MoneyType.register ~= nil then
+        MoneyType.UWM_DEPOT_INCOME = MoneyType.register("uwmDepotIncome", "uwm_finance_depotIncome")
+        MoneyType.UWM_DEPOT_EXPENSE = MoneyType.register("uwmDepotExpense", "uwm_finance_depotExpense")
+    end
     MoneyType.UWM_INCOME = MoneyType.UWM_INCOME or MoneyType.SOLD_PRODUCTS
     MoneyType.UWM_EXPENSE = MoneyType.UWM_EXPENSE or MoneyType.BOUGHT_MATERIALS
+    MoneyType.UWM_DEPOT_INCOME = MoneyType.UWM_DEPOT_INCOME or MoneyType.PROPERTY_INCOME or MoneyType.UWM_INCOME
+    MoneyType.UWM_DEPOT_EXPENSE = MoneyType.UWM_DEPOT_EXPENSE or MoneyType.PROPERTY_MAINTENANCE or MoneyType.UWM_EXPENSE
 
     local isServer = g_currentMission:getIsServer()
     UWM.manager = UWMManager.new(isServer)
@@ -121,6 +130,9 @@ function UWM:loadMap(filename)
     UWMPickup.installHooks()
 
     g_messageCenter:subscribe(MessageType.DAY_CHANGED, UWM.onDayChanged, UWM)
+    if MessageType.PERIOD_CHANGED ~= nil then
+        g_messageCenter:subscribe(MessageType.PERIOD_CHANGED, UWM.onPeriodChanged, UWM)
+    end
 
     print(string.format("%s loaded (%d goods)", UWM.TAG, #UWM.goods))
 end
@@ -147,6 +159,12 @@ function UWM:onDayChanged()
     end
 end
 
+function UWM:onPeriodChanged()
+    if UWM.manager ~= nil then
+        UWM.manager:onPeriodChanged()
+    end
+end
+
 addModEventListener(UWM)
 
 ----------------------------------------------------------------------------------------------------------------
@@ -157,9 +175,16 @@ function UWM.showNotification(farmId, key, farmName, fillTypeIndex, detail)
     if g_currentMission == nil or not g_currentMission:getIsClient() or farmId ~= UWM.getLocalFarmId() then
         return
     end
-    local text = string.format(UWM.getText(key), farmName, UWM.getGoodName(fillTypeIndex), detail or "")
+    local text
+    if key:find("^uwm_notify_depot") ~= nil then
+        -- depot messages: the depot owner(s), then an amount or a farm name
+        text = string.format(UWM.getText(key), farmName, detail or "")
+    else
+        text = string.format(UWM.getText(key), farmName, UWM.getGoodName(fillTypeIndex), detail or "")
+    end
     local notificationType = FSBaseMission.INGAME_NOTIFICATION_INFO
-    if key == "uwm_notify_contractFailed" then
+    if key == "uwm_notify_contractFailed" or key == "uwm_notify_depotUnpaid" or key == "uwm_notify_depotSuspended"
+        or key == "uwm_notify_depotArrears" then
         notificationType = FSBaseMission.INGAME_NOTIFICATION_CRITICAL
     end
     g_currentMission:addIngameNotification(notificationType, text)
@@ -200,7 +225,8 @@ local function onLoadMission00Finished(mission)
 end
 
 -- the finance page asks for "finance_<stat>" without a mod environment; answer ours from this mod's texts
-local FINANCE_TEXTS = {finance_uwmIncome = true, finance_uwmExpense = true, uwm_finance_income = true, uwm_finance_expense = true}
+local FINANCE_TEXTS = {finance_uwmIncome = true, finance_uwmExpense = true, uwm_finance_income = true, uwm_finance_expense = true,
+    finance_uwmDepotIncome = true, finance_uwmDepotExpense = true, uwm_finance_depotIncome = true, uwm_finance_depotExpense = true}
 local function getText(i18n, superFunc, text, modEnv)
     if modEnv == nil and FINANCE_TEXTS[text] then
         return superFunc(i18n, text, UWM.modName)

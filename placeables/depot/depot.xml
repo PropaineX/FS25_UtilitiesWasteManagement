@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<!-- Utilities & Waste Management: the community depot. Our slurry tank + office (depot.i3d, built in Blender by
+     source/export_depot.py) with the base-game Farma 400 loaded from the game's own files into node farma400 by UWMDepot.
+     Slurry is collected at the tank's coupling, manure under the Farma 400's loading pipe; the office door opens
+     the Utilities page. The pickups have no storage: the liters come live out of the sellers' own stock. -->
+<placeable type="uwmDepot">
+    <storeData>
+        <name>$l10n_uwm_depot_name</name>
+        <functions>
+            <function>$l10n_uwm_depot_function</function>
+        </functions>
+        <image>placeables/depot/store_depot.png</image>
+        <price>268000</price>
+        <dailyUpkeep>268</dailyUpkeep>
+        <lifetime>1000</lifetime>
+        <rotation>0</rotation>
+        <brand>NONE</brand>
+        <species>PLACEABLE</species>
+        <category>sellingPoints</category>
+        <brush>
+            <type>placeable</type>
+            <category>production</category>
+            <tab>sellingPoints</tab>
+        </brush>
+    </storeData>
+
+    <base>
+        <filename>placeables/depot/depot.i3d</filename>
+        <canBeRenamed>true</canBeRenamed>
+    </base>
+
+    <placement useRandomYRotation="false" useManualYRotation="true">
+        <testAreas>
+            <testArea startNode="testAreaStart" endNode="testAreaEnd"/>
+        </testAreas>
+        <sounds>
+            <place template="siloImp"/>
+        </sounds>
+    </placement>
+
+    <clearAreas>
+        <clearArea startNode="clearAreaStart" widthNode="clearAreaWidth" heightNode="clearAreaHeight"/>
+    </clearAreas>
+
+    <leveling requireLeveling="true" maxSmoothDistance="1" maxSlope="75" maxEdgeAngle="30">
+        <levelAreas>
+            <levelArea startNode="levelAreaStart" widthNode="levelAreaWidth" heightNode="levelAreaHeight" groundType="asphalt"/>
+        </levelAreas>
+    </leveling>
+
+    <indoorAreas/>
+
+    <tipOcclusionUpdateAreas>
+        <tipOcclusionUpdateArea startNode="tipOcclusionStart" endNode="tipOcclusionEnd"/>
+    </tipOcclusionUpdateAreas>
+
+    <ai>
+        <updateAreas>
+            <updateArea startNode="tipOcclusionStart" endNode="tipOcclusionEnd"/>
+        </updateAreas>
+    </ai>
+
+    <hotspots>
+        <hotspot type="UNLOADING" linkNode="mapPosition"/>
+    </hotspots>
+
+    <triggerMarkers>
+        <triggerMarker node="slurryMarker" filename="$data/shared/assets/marker/markerIconLoad.i3d"/>
+        <triggerMarker node="manureMarker" filename="$data/shared/assets/marker/markerIconLoad.i3d"/>
+        <triggerMarker node="officeMarker" filename="$data/shared/assets/marker/markerIconShopping.i3d"/>
+    </triggerMarkers>
+
+    <!-- The manure effect nodes 0>5|0|4|0|0|2|0 / |1 (pipeEffect / pipeEffectSmoke) live inside the Farma 400 that
+         UWMDepot loads into node farma400 (its root uniaFarma400 = 0>5|0) before this loading station is read. They
+         are raw paths on purpose: i3dMappings are resolved when the i3d finishes loading, before the Farma is there
+         (first in-game test: "Index not found"); a raw path is resolved when it is read. Hidden unless loading. -->
+    <uwmDepot officeTrigger="officeTrigger" farmaNode="farma400">
+        <loadingStation node="triggers" fillTypes="LIQUIDMANURE MANURE">
+            <loadTrigger triggerNode="slurryTrigger" fillLitersPerSecond="1000" dischargeNode="slurryDischarge" fillTypes="LIQUIDMANURE"/>
+            <loadTrigger triggerNode="manureTrigger" fillLitersPerSecond="2000" dischargeNode="manureDischarge" fillTypes="MANURE">
+                <effectNode effectClass="PipeEffect" effectNode="0>5|0|4|0|0|2|0" materialType="pipe" fadeTime="0.5" maxBending="0" controlPoint="4.8 0 0 0"/>
+                <effectNode effectNode="0>5|0|4|0|0|2|1" materialType="unloadingSmoke" fadeTime="0.5"/>
+                <sounds>
+                    <loading template="silosActive"/>
+                </sounds>
+            </loadTrigger>
+        </loadingStation>
+    </uwmDepot>
+
+    <i3dMappings>
+        <i3dMapping id="clearAreaStart" node="0>0|0"/>
+        <i3dMapping id="clearAreaHeight" node="0>0|0|0"/>
+        <i3dMapping id="clearAreaWidth" node="0>0|0|1"/>
+        <i3dMapping id="levelAreaStart" node="0>0|1"/>
+        <i3dMapping id="levelAreaHeight" node="0>0|1|0"/>
+        <i3dMapping id="levelAreaWidth" node="0>0|1|1"/>
+        <i3dMapping id="testAreaStart" node="0>0|2"/>
+        <i3dMapping id="testAreaEnd" node="0>0|2|0"/>
+        <i3dMapping id="tipOcclusionStart" node="0>0|3"/>
+        <i3dMapping id="tipOcclusionEnd" node="0>0|3|0"/>
+        <i3dMapping id="triggers" node="0>4"/>
+        <i3dMapping id="manureDischarge" node="0>4|0"/>
+        <i3dMapping id="manureMarker" node="0>4|1"/>
+        <i3dMapping id="manureTrigger" node="0>4|2"/>
+        <i3dMapping id="mapPosition" node="0>4|3"/>
+        <i3dMapping id="officeMarker" node="0>4|4"/>
+        <i3dMapping id="officeTrigger" node="0>4|5"/>
+        <i3dMapping id="slurryDischarge" node="0>4|6"/>
+        <i3dMapping id="slurryMarker" node="0>4|7"/>
+        <i3dMapping id="slurryTrigger" node="0>4|8"/>
+        <i3dMapping id="farma400" node="0>5"/>
+    </i3dMappings>
+</placeable>

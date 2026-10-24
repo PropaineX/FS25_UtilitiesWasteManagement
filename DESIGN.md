@@ -1,7 +1,7 @@
 # Utilities & Waste Management (FS25) - design
 
-Author PropaineX. Started 2026-10-23. Status: stages 1, 2 and 4 written (v0.1.0.0, untested in game); stage 3
-(the pickup building) not started. File notes in CLAUDE.md.
+Author PropaineX. Started 2026-10-23. Status 2026-10-24: all stages written; the depot (stage 3) is in 0.4.0.0
+(source only, not yet tried in game). File notes in CLAUDE.md.
 
 Farms trade **electricity, slurry and manure** with each other through invoices. (Propane removed by the user,
 2026-10-23.)
@@ -42,6 +42,28 @@ Digestate (`DIGESTATE`) could be added later on the slurry point if wanted (not 
   - Electricity: paid as it is delivered (delivery is instant), only for what actually arrived.
   - Shows in the finance page as its own income/expense rows.
 
+## Standing orders (user's idea, 2026-10-24)
+
+An order put up for **every farm** instead of billed to one farm. Two kinds, all three goods:
+- **Standing offer (selling):** "I have 1,000,000 l of slurry". Any farm buys **any amount** up to what's left (no
+  minimum, no maximum, one farm may take it all) and pays at once; the poster is paid for each purchase.
+- **Standing order (buying, "wanted"):** "I want 1,000,000 l". Any farm sells **any amount it has** up to what's
+  left and is paid at once. When it reaches the full amount it stops: complete.
+- **Anyone can see and use it** (user): every depot member; same depot lock as invoices.
+- **The offer freezes the poster's stock** (user: "freeze my stock or reserve it"): from posting until sold out or
+  withdrawn, what's left can't be loaded out, sold by invoice or put on another offer.
+- Claude's mirror of that for wanted orders (2026-10-24, tell the user): the **money for the whole order is taken
+  when posting and held**; sellers are paid from it; withdrawing gives back what's still held.
+- Every purchase / sale is a normal paid invoice between the poster and that farm (reserved for the buyer, collected
+  at the depot; electricity goes straight into the buyer's productions, paid only for what fits).
+- Only the poster's farm manager withdraws it; finished ones go to the poster's history (Delete / Clear history).
+
+**Page layout (user, 2026-10-24, from screenshots of another mod's invoicing page: "very similar, don't copy"):**
+menu driven with tabs, not one long list. Mock-up `previews/menu_v1_*.png` (`previews/menu_mockup_v1.py`), OK'd by
+the user and built in 0.5.0.0: header (icon, title, depot status, BALANCE box), tabs INCOMING / OUTGOING / STANDING ORDERS, the
+last with sub-tabs MARKET / MY ORDERS / MY DEALS, column headings, empty-list line, key hints at the bottom.
+ESC menu tab icon: a water drop with a lightning bolt inside (user, 2026-10-24), also the page header icon.
+
 ## Collecting manure and slurry (user's rule, 2026-10-23)
 
 **Two places to collect (user's choice, 2026-10-23, after the first MP test):** (1) at the SELLER's own loading
@@ -66,6 +88,9 @@ and loading stops when the paid liters are collected or the seller's stock runs 
   silo rate - Farma 400 $120/day on $117,000; earlier tries 1 % and 0.17 % dropped). On the user's server one
   month is one day (every sleep = a new day = a new month), so daily and monthly are the same. The upkeep is split
   equally between the owner and every farm that agreed to be a member. Placeable XML: dailyUpkeep 268.
+- **What each part does** (user, 2026-10-24): the tank's pump coupling = **slurry** pickup, the Farma 400's
+  loading pipe = **manure** pickup (its pipe effect runs while loading, otherwise hidden), the office door =
+  opens the **Utilities** page.
 - **One farm owns it and pays the bills** (price + upkeep). Sharing the cost is up to the owner: free, or a
   **recurring cost-share invoice** that splits the cost between the farms (e.g. three ways) and bills them every month.
 - **Only one depot on the map.** A setting, default ON; when it's off, more can be placed. It's a **server
@@ -103,7 +128,19 @@ and loading stops when the paid liters are collected or the seller's stock runs 
    delivered straight from the seller's productions into the buyer's chosen productions, no depot pickup. It still
    needs a depot on the map and depot membership, like every invoice.
 
-Still to settle: the depot's look (preview first).
+**As built in 0.4.0.0 (Claude's choices where the rules left room, 2026-10-24):**
+- Membership is to "the depot" as a whole (one depot per map by default). With more depots allowed, the members'
+  shares are split between the owners by each owner's part of the total upkeep; owners don't settle with each other.
+- The share is taken on every in-game day; a member short of money pays nothing that day and the share goes on its
+  arrears. Month end = the game's PERIOD_CHANGED. Arrears are paid in one go (Depot button), which lifts a suspension.
+- No depot, or a seller/buyer not allowed to trade: a standing contract skips that period (status shows why).
+- The farm manager answers the offer, asks again and pays arrears; the "more than one depot" switch is for the server
+  admin (master user; the host / singleplayer player).
+- The Utilities tab in the ESC menu is hidden until a depot stands on the map (user, 2026-10-24).
+- **Leaving** (user, 2026-10-24): a member can leave (Depot button, confirmed with Yes/No); it then can't ask to rejoin
+  for 6 in-game months (counted on PERIOD_CHANGED) and gets no automatic offer. Any debt to the depot is taken from
+  the farm's account when it leaves, even into the negative (user, 2026-10-24); paid invoices can still be collected
+  or ended. Depot owners get a message.
 
 ### Buyer's options on a manure / slurry invoice (user's rules, 2026-10-23)
 

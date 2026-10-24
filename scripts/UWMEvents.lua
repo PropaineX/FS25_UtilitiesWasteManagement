@@ -1,5 +1,5 @@
 -- Utilities & Waste Management: network events.
--- UWMRequestEvent  client -> server  a farm manager's request (create, accept, decline, cancel)
+-- UWMRequestEvent  client -> server  a farm manager's request (invoices, depot membership) or an admin setting
 -- UWMResultEvent   server -> client  the answer to that request
 -- UWMSyncEvent     server -> clients the whole invoice list (on join and after every change)
 -- UWMNotifyEvent   server -> clients a message for one farm
@@ -13,7 +13,8 @@ function UWMRequestEvent.emptyNew()
     return Event.new(UWMRequestEvent_mt)
 end
 
--- data: {invoice = UWMInvoice (CREATE only), invoiceId, reserve, targetPlaceables}
+-- data: {invoice = UWMInvoice (CREATE only), invoiceId, reserve, flag (admin setting), targetPlaceables,
+--        listing = UWMListing (POST_LISTING only), listingId, liters (TRADE_LISTING)}
 -- The buyer's electricity productions travel as network objects: a placed building's uniqueId is NOT sent to
 -- clients (Placeable:writeStream), each client makes up its own, so the server turns the objects into its own
 -- uniqueIds (data.targets) when the request arrives.
@@ -32,6 +33,12 @@ function UWMRequestEvent:writeStream(streamId, connection)
         data.invoice:writeStream(streamId)
     end
     streamWriteBool(streamId, data.reserve == true)
+    streamWriteBool(streamId, data.flag == true)
+    streamWriteInt32(streamId, data.listingId or 0)
+    streamWriteFloat32(streamId, data.liters or 0)
+    if streamWriteBool(streamId, data.listing ~= nil) then
+        data.listing:writeStream(streamId)
+    end
     local placeables = data.targetPlaceables
     if streamWriteBool(streamId, placeables ~= nil) then
         local count = math.min(#placeables, UWMInvoice.MAX_TARGETS)
@@ -51,6 +58,13 @@ function UWMRequestEvent:readStream(streamId, connection)
         self.data.invoice:readStream(streamId)
     end
     self.data.reserve = streamReadBool(streamId)
+    self.data.flag = streamReadBool(streamId)
+    self.data.listingId = streamReadInt32(streamId)
+    self.data.liters = streamReadFloat32(streamId)
+    if streamReadBool(streamId) then
+        self.data.listing = UWMListing.new()
+        self.data.listing:readStream(streamId)
+    end
     if streamReadBool(streamId) then
         local placeables = {}
         for _ = 1, streamReadUInt8(streamId) do

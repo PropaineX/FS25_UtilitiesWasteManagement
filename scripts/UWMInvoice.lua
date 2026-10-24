@@ -51,6 +51,8 @@ function UWMInvoice.new()
     self.hiddenBySeller = false -- a farm deleted it from its own history (removed once both have)
     self.hiddenByBuyer = false
     self.statusKey = ""         -- l10n key of the last problem, "" = none
+    self.listingId = 0          -- made from this standing order (0 = a normal invoice)
+    self.prepaid = false        -- the buyer paid up front by posting a wanted order: the seller is paid from that
 
     return self
 end
@@ -114,6 +116,8 @@ function UWMInvoice:writeStream(streamId)
     streamWriteBool(streamId, self.hiddenBySeller)
     streamWriteBool(streamId, self.hiddenByBuyer)
     streamWriteString(streamId, self.statusKey)
+    streamWriteInt32(streamId, self.listingId)
+    streamWriteBool(streamId, self.prepaid)
 end
 
 function UWMInvoice:readStream(streamId)
@@ -140,6 +144,8 @@ function UWMInvoice:readStream(streamId)
     self.hiddenBySeller = streamReadBool(streamId)
     self.hiddenByBuyer = streamReadBool(streamId)
     self.statusKey = streamReadString(streamId)
+    self.listingId = streamReadInt32(streamId)
+    self.prepaid = streamReadBool(streamId)
 end
 
 function UWMInvoice.writeTargets(streamId, targets)
@@ -183,6 +189,8 @@ function UWMInvoice:saveToXMLFile(xmlFile, key)
     xmlFile:setBool(key .. "#hiddenBySeller", self.hiddenBySeller)
     xmlFile:setBool(key .. "#hiddenByBuyer", self.hiddenByBuyer)
     xmlFile:setString(key .. "#statusKey", self.statusKey)
+    xmlFile:setInt(key .. "#listingId", self.listingId)
+    xmlFile:setBool(key .. "#prepaid", self.prepaid)
 
     for i, uniqueId in ipairs(self.targets) do
         xmlFile:setString(string.format("%s.target(%d)#uniqueId", key, i - 1), uniqueId)
@@ -219,6 +227,8 @@ function UWMInvoice:loadFromXMLFile(xmlFile, key)
     self.hiddenBySeller = xmlFile:getBool(key .. "#hiddenBySeller", false)
     self.hiddenByBuyer = xmlFile:getBool(key .. "#hiddenByBuyer", false)
     self.statusKey = xmlFile:getString(key .. "#statusKey", "")
+    self.listingId = xmlFile:getInt(key .. "#listingId", 0)
+    self.prepaid = xmlFile:getBool(key .. "#prepaid", false)
 
     self.targets = {}
     xmlFile:iterate(key .. ".target", function(_, targetKey)

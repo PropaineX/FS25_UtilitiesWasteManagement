@@ -15,6 +15,6 @@ texts = lua.table_from({e.get("name"): e.findtext("en") for e in ET.parse(mod / 
 lua.globals().UWM_TEXTS = texts
 
 run(tests / "stubs.lua")
-for name in ["UWMInvoice", "UWMStock", "UWMManager", "UWMEvents", "UWMPickup", "UtilitiesWasteManagement", "gui/UWMFrame"]:
+for name in ["UWMInvoice", "UWMListing", "UWMStock", "UWMManager", "UWMEvents", "UWMPickup", "UWMDepot", "UtilitiesWasteManagement", "gui/UWMFrame"]:
     run(mod / "scripts" / (name + ".lua"))
 sys.exit(1 if run(tests / "scenarios.lua") else 0)

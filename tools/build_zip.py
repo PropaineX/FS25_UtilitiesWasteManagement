@@ -9,8 +9,12 @@ import zipfile
 project = pathlib.Path(__file__).resolve().parent.parent
 out = pathlib.Path(sys.argv[1])
 
-files = ["modDesc.xml", "icon_UtilitiesWasteManagement.dds", "gui/UWMFrame.xml"]
+files = ["modDesc.xml", "icon_UtilitiesWasteManagement.dds", "gui/UWMFrame.xml", "gui/uwm_tabIcon.dds"]
 files += sorted(p.relative_to(project).as_posix() for p in (project / "scripts").rglob("*.lua"))
+# the depot (0.4): placeable xml, i3d + shapes, shop picture, textures
+depot = project / "placeables" / "depot"
+files += ["placeables/depot/" + n for n in ("depot.xml", "depot.i3d", "depot.i3d.shapes", "store_depot.dds")]
+files += sorted(p.relative_to(project).as_posix() for p in (depot / "textures").glob("*.dds"))
 
 if out.exists():
     sys.exit(f"{out} already exists: move it out of the way first")

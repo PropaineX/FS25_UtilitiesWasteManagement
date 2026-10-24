@@ -1,10 +1,12 @@
--- Utilities & Waste Management: buyers collect paid manure / slurry at the SELLER's own loading points (slurry
--- pits, manure heaps, silos). The game only lets a station's own farm load there; for a farm with paid,
--- uncollected liters from that station's owner this mod answers the three questions the load trigger asks:
---   getIsFillAllowedToFarm  -> yes, while something is left to collect
+-- Utilities & Waste Management: buyers collect paid manure / slurry at the community depot (UWMDepot). The depot's
+-- fill points are a game LoadingStation with no storages of its own (flag uwmIsDepot); for those this mod answers
+-- the three questions the load trigger asks:
+--   getIsFillAllowedToFarm  -> yes, while the farm has paid liters left to collect
 --   getAllFillLevels        -> only the goods paid for, with the liters left to collect (the R list)
---   addFillLevelToFillableObject (server) -> take it from the seller's stock and count it against the invoice
--- Everything else stays the game's own code. (The pickup building, later, uses the same collect code.)
+--   addFillLevelToFillableObject (server) -> take them from the sellers' stock, oldest invoice first
+-- Every other loading station stays the game's own, plus the reservation guard (UWMStock) for the seller's own
+-- vehicles. (0.2/0.3 let buyers load at the seller's pits, heaps and silos; since 0.4 the depot is the only
+-- pickup - user's rule.)
 -- Author: PropaineX
 
 UWMPickup = {}
@@ -26,18 +28,10 @@ function UWMPickup.getFarmIdForObject(object)
     return nil
 end
 
-function UWMPickup.getStationOwner(station)
-    if station.owningPlaceable ~= nil then
-        return station.owningPlaceable:getOwnerFarmId()
-    end
-    return nil
-end
-
--- fill type -> liters the buyer may collect here (paid for, from this station's owner, and in the seller's stock)
+-- fill type -> liters the farm may collect at this depot station (paid for and in the sellers' stock, any seller)
 function UWMPickup.getCollectable(station, buyerFarmId)
     local manager = UtilitiesWasteManagement.manager
-    local sellerFarmId = UWMPickup.getStationOwner(station)
-    if manager == nil or sellerFarmId == nil or buyerFarmId == nil or buyerFarmId == sellerFarmId then
+    if manager == nil or not station.uwmIsDepot or buyerFarmId == nil then
         return nil
     end
     local supported = station.getSupportedFillTypes ~= nil and station:getSupportedFillTypes() or nil
@@ -46,7 +40,7 @@ function UWMPickup.getCollectable(station, buyerFarmId)
     for _, good in ipairs(UtilitiesWasteManagement.goods) do
         local fillTypeIndex = good.fillTypeIndex
         if fillTypeIndex ~= FillType.ELECTRICCHARGE and (supported == nil or supported[fillTypeIndex]) then
-            local liters = manager:getCollectableLiters(buyerFarmId, fillTypeIndex, sellerFarmId)
+            local liters = manager:getCollectableLiters(buyerFarmId, fillTypeIndex)
             if liters > 0.5 then
                 collectable = collectable or {}
                 collectable[fillTypeIndex] = liters
@@ -57,59 +51,58 @@ function UWMPickup.getCollectable(station, buyerFarmId)
 end
 
 function UWMPickup.getIsFillAllowedToFarm(station, superFunc, farmId, ...)
-    if superFunc(station, farmId, ...) then
-        return true
+    if station.uwmIsDepot then
+        return UWMPickup.getCollectable(station, farmId) ~= nil
     end
-    return UWMPickup.getCollectable(station, farmId) ~= nil
+    return superFunc(station, farmId, ...)
 end
 
 function UWMPickup.getAllFillLevels(station, superFunc, farmId, ...)
     local fillLevels, capacity = superFunc(station, farmId, ...)
-    local collectable = UWMPickup.getCollectable(station, farmId)
-    if collectable == nil then
-        return fillLevels, capacity
+    if station.uwmIsDepot then
+        -- the depot holds nothing itself: a farm sees what it paid for
+        return UWMPickup.getCollectable(station, farmId) or {}, capacity
     end
-    -- a buyer at someone else's station sees only what he paid for
-    return collectable, capacity
+    return fillLevels, capacity
 end
 
--- server: a buyer's vehicle loading at the seller's station
+-- server: a vehicle loading at the depot draws its farm's paid liters from the sellers' stock
 function UWMPickup.addFillLevelToFillableObject(station, superFunc, fillableObject, fillUnitIndex, fillTypeIndex, fillDelta, fillInfo, toolType, ...)
-    local manager = UtilitiesWasteManagement.manager
-    local buyerFarmId = UWMPickup.getFarmIdForObject(fillableObject)
-    local sellerFarmId = UWMPickup.getStationOwner(station)
-
-    if manager ~= nil and station.isServer and fillDelta ~= nil and fillDelta > 0 and buyerFarmId ~= nil
-        and sellerFarmId ~= nil and buyerFarmId ~= sellerFarmId
-        and manager:getCollectableLiters(buyerFarmId, fillTypeIndex, sellerFarmId) > 0 then
-
-        local free = fillableObject:getFillUnitFreeCapacity(fillUnitIndex, fillTypeIndex, buyerFarmId) or fillDelta
-        local want = math.min(fillDelta, free)
-        if want <= 0 then
-            return 0
-        end
-        local taken = manager:collect(buyerFarmId, fillTypeIndex, want, sellerFarmId)
-        if taken <= 0 then
-            return 0
-        end
-        local added = fillableObject:addFillUnitFillLevel(buyerFarmId, fillUnitIndex, taken, fillTypeIndex,
-            toolType or ToolType.TRIGGER, fillInfo) or 0
-        if added < taken - 0.001 then
-            manager:returnCollected(buyerFarmId, fillTypeIndex, taken - added, sellerFarmId)
-        end
-        return added
+    if not station.uwmIsDepot then
+        -- everyone at an ordinary station, incl. the seller's own vehicles (reservation guard)
+        return UWMStock.addFillLevelToFillableObject(station, superFunc, fillableObject, fillUnitIndex, fillTypeIndex, fillDelta,
+            fillInfo, toolType, ...)
     end
 
-    -- everyone else, incl. the seller's own vehicles (reservation guard)
-    return UWMStock.addFillLevelToFillableObject(station, superFunc, fillableObject, fillUnitIndex, fillTypeIndex, fillDelta,
-        fillInfo, toolType, ...)
+    local manager = UtilitiesWasteManagement.manager
+    local buyerFarmId = UWMPickup.getFarmIdForObject(fillableObject)
+    if manager == nil or not station.isServer or fillDelta == nil or fillDelta <= 0 or buyerFarmId == nil
+        or manager:getCollectableLiters(buyerFarmId, fillTypeIndex) <= 0 then
+        return 0
+    end
+
+    local free = fillableObject:getFillUnitFreeCapacity(fillUnitIndex, fillTypeIndex, buyerFarmId) or fillDelta
+    local want = math.min(fillDelta, free)
+    if want <= 0 then
+        return 0
+    end
+    local taken = manager:collect(buyerFarmId, fillTypeIndex, want)
+    if taken <= 0 then
+        return 0
+    end
+    local added = fillableObject:addFillUnitFillLevel(buyerFarmId, fillUnitIndex, taken, fillTypeIndex,
+        toolType or ToolType.TRIGGER, fillInfo) or 0
+    if added < taken - 0.001 then
+        manager:returnCollected(buyerFarmId, fillTypeIndex, taken - added)
+    end
+    return added
 end
 
 -- Installed once per game run on LoadingStation, dispatching through LoadingStation.uwmPickupHandler (set and
 -- cleared per mission) so a hook left from an earlier savegame never runs stale code.
 function UWMPickup.installHooks()
     if LoadingStation == nil then
-        print(UtilitiesWasteManagement.TAG .. " LoadingStation not found, buyers can't collect at the seller's stations")
+        print(UtilitiesWasteManagement.TAG .. " LoadingStation not found, nothing can be collected at the depot")
         return
     end
     LoadingStation.uwmPickupHandler = UWMPickup
@@ -128,10 +121,10 @@ function UWMPickup.installHooks()
                 return superFunc(station, ...)
             end)
         else
-            print(string.format("%s LoadingStation.%s not found, collecting at the seller's stations may not work", UtilitiesWasteManagement.TAG, name))
+            print(string.format("%s LoadingStation.%s not found, collecting at the depot may not work", UtilitiesWasteManagement.TAG, name))
         end
     end
-    print(UtilitiesWasteManagement.TAG .. " buyers can collect at the seller's loading stations")
+    print(UtilitiesWasteManagement.TAG .. " paid manure and slurry can be collected at the depot")
 end
 
 function UWMPickup.removeHooks()
