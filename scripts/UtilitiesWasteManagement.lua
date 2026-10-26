@@ -128,6 +128,7 @@ function UWM:loadMap(filename)
     end
     -- clients need it too: the load trigger asks the station whether the player's vehicle may load, and for the list
     UWMPickup.installHooks()
+    UWMStock.installProductionHooks()
 
     g_messageCenter:subscribe(MessageType.DAY_CHANGED, UWM.onDayChanged, UWM)
     if MessageType.PERIOD_CHANGED ~= nil then

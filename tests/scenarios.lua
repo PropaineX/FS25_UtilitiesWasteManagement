@@ -653,5 +653,49 @@ check("standing order details", contains(details, "Standing order SO-002") and c
 details = UWMFrame.getDetailsText(deal, 2)
 check("deal details say which standing order", contains(details, "From standing order SO-001"), details)
 
+-- Automatic production output must leave standing offers intact and pay only for the surplus.
+reset()
+local powerStorage = newStorage({[FillType.ELECTRICCHARGE] = 1000000}, 2000000)
+local powerPoint = {storage = powerStorage, outputFillTypeIds = {[FillType.ELECTRICCHARGE] = true}, inputFillTypeIds = {}}
+powerPoint.getOwnerFarmId = function() return 1 end
+add(newPlaceable(1, "spec_productionPoint", {productionPoint = powerPoint}))
+post(10, UWMListing.KIND.OFFER, FillType.ELECTRICCHARGE, 500000, 100)
+local powerOffer = lastListing()
+local chain = {isServer = true, productionPoints = {powerPoint}}
+local sold = 0
+local function autoSell(c)
+    for _, point in ipairs(c.productionPoints) do
+        local levels = point.storage:getFillLevels()
+        local amount = levels[FillType.ELECTRICCHARGE] or 0
+        sold = sold + amount
+        point.storage:setFillLevel(0, FillType.ELECTRICCHARGE)
+        g_currentMission:addMoney(amount * 0.1, point:getOwnerFarmId())
+    end
+    return "sold", nil, 42
+end
+local balance = farms[1].money
+local a, b, c = UWMStock.updateProductionSales(chain, autoSell)
+check("auto sell: 1 million stock, 500000 offered, sells only 500000", near(sold, 500000)
+    and near(powerStorage:getFillLevel(FillType.ELECTRICCHARGE), 500000))
+check("auto sell pays only for the unreserved electricity", near(farms[1].money - balance, 50000))
+check("production storage identity and return values restored", powerPoint.storage == powerStorage and a == "sold" and b == nil and c == 42)
+UWMStock.updateProductionSales(chain, autoSell)
+check("next auto sell leaves the reservation untouched", near(sold, 500000) and near(powerOffer.remaining, 500000))
+powerStorage:setFillLevel(600000, FillType.ELECTRICCHARGE)
+UWMStock.updateProductionSales(chain, autoSell)
+check("newly generated surplus can still auto sell", near(sold, 600000) and near(powerStorage:getFillLevel(FillType.ELECTRICCHARGE), 500000))
+local extraStorage = newStorage({[FillType.ELECTRICCHARGE] = 250000}, 2000000)
+local extraPoint = {storage = extraStorage, outputFillTypeIds = {[FillType.ELECTRICCHARGE] = true}, inputFillTypeIds = {}, getOwnerFarmId = function() return 1 end}
+add(newPlaceable(1, "spec_productionPoint", {productionPoint = extraPoint}))
+table.insert(chain.productionPoints, extraPoint)
+UWMStock.updateProductionSales(chain, autoSell)
+check("multiple productions reserve 500000 once across the farm", near(sold, 850000)
+    and near(UWMStock.getStock(1, FillType.ELECTRICCHARGE), 500000))
+local success = pcall(UWMStock.updateProductionSales, chain, function() error("test failure") end)
+check("failed auto sell restores the real storage", not success and powerPoint.storage == powerStorage and extraPoint.storage == extraStorage)
+M:handleRequest(A.WITHDRAW_LISTING, 10, {listingId = powerOffer.id})
+UWMStock.updateProductionSales(chain, autoSell)
+check("canceling the standing offer releases electricity to auto sell", near(sold, 1350000) and near(UWMStock.getStock(1, FillType.ELECTRICCHARGE), 0))
+
 print(string.format("%d passed, %d failed", passed, failed))
 return failed

@@ -1,4 +1,4 @@
-"""Exports our depot buildings (slurry tank + office, as laid out in depot_look_v9.py) to an i3d for FS25.
+"""Exports the depot tank, office, manure pit and decorative pallet pad to an i3d for FS25.
 
 Builds the scene with depot_look_v9.py (render calls left out), drops the preview-only objects (ground, Farma 400
 outline, cameras, light), turns curves/text into meshes with their modifiers applied, exports with the GIANTS
@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 import bpy
 
 args = sys.argv[sys.argv.index("--") + 1:]
-OUT_DIR, TEX_SRC = args[0], args[1]
+OUT_DIR, TEX_SRC = os.path.abspath(args[0]), os.path.abspath(args[1])
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 # 1. build the scene (same code as the previews, without rendering)
@@ -96,7 +96,7 @@ for nm, props in (("officeCollision", BUILDING), ("officeTipCollision", TIP)):
                                                          scale=(4.6, 4.6, 5.2)), props, cols)
 # placement areas (game convention: start node with the end / width / height nodes as children)
 areas = empty("areas", (0, 0, 0), depot)
-X0, X1, ZN, ZF = -12.5, 10.5, 7.2, -21.5          # game x min/max, game z near/far
+X0, X1, ZN, ZF = -16.5, 15.5, 7.2, -21.5          # pit frontage and slurry loading lane included
 def gp(x, z, y=0.0):
     return V((x, -z, y))                             # game (x, y, z) -> Blender
 t0 = empty("testAreaStart", gp(X0, ZN), areas)
@@ -134,15 +134,64 @@ def trigger_box(name, centre, size, props):
 trigger_box("slurryTrigger", (13.0, 1.75, -15.6), (5.0, 3.5, 14.0), FILL_TRIGGER)
 empty("slurryDischarge", gp(9.8, -15.6, 1.3), trig)
 empty("slurryMarker", gp(11.8, -15.6, 0.0), trig)
-# manure: under the Farma 400's loading pipe (its dischargeEffect sits at x 0, y 3.94, z 5.49); trailers drive
-# through along x like at the base-game silo
-trigger_box("manureTrigger", (0.0, 2.5, 5.5), (14.0, 5.0, 4.0), FILL_TRIGGER)
-empty("manureDischarge", gp(-0.012, 5.49, 3.94), trig)
-empty("manureMarker", gp(0.0, 5.1, 0.0), trig)
+# manure: open/front (-x) end of the new pit, facing the same direction as the office door.
+# A trailer stands across the entrance; the pickup is not attached to the Farma pipe anymore.
+trigger_box("manureTrigger", (-16.0, 2.5, -17.175), (5.0, 5.0, 8.0), FILL_TRIGGER)
+empty("manureDischarge", gp(-14.8, -17.175, 3.5), trig)
+empty("manureMarker", gp(-16.0, -17.175, 0.0), trig)
 # office door (door face at game x -12.1, z -8.05, opening to -x)
 trigger_box("officeTrigger", (-13.3, 1.0, -8.05), (2.0, 2.0, 2.4), PLAYER_TRIGGER)
 empty("officeMarker", gp(-13.3, -8.05, 0.0), trig)           # the shop-basket icon on the ground at the door
 empty("mapPosition", gp(0.0, -6.0, 0.0), trig)
+
+# Approved photo layout, 2026-10-26. In the photo, down = game -x and right = game +z.
+# Tank centre (0,-14.5), radius 6.85. Pit back is tangent to its near edge; left wall
+# aligns with the tank's far-left z edge. Right wall leaves 2 m to office z=-11.0.
+pit = empty("manurePit", (0, 0, 0), depot)
+pad_root = empty("palletArea", (0, 0, 0), depot)
+
+def visual_box(name, centre, size, material, parent):
+    o = g["box"](name, (size[0], size[2], size[1]), gp(centre[0], centre[2], centre[1]),
+                 bpy.data.materials[material])
+    g["box_uv"](o, 2.0)
+    o["i3D_collision"] = False
+    o["i3D_static"] = False
+    bpy.context.view_layer.update()
+    mw = o.matrix_world.copy()
+    o.parent = parent
+    o.matrix_world = mw
+    return o
+
+wall_h, wall_t = 1.8, 0.25
+back_x, front_x, left_z, right_z = -7.2, -14.5, -21.35, -13.0
+pit_width = right_z - left_z
+pit_length = back_x - front_x
+visual_box("manurePitFloor", ((front_x + back_x)/2, -0.09, (left_z + right_z)/2),
+           (pit_length, 0.10, pit_width), "uwmConcrete", pit)
+walls = [
+    ("manurePitBack", (back_x, 0, (left_z + right_z)/2), (wall_t, wall_h, pit_width + wall_t)),
+    ("manurePitLeft", ((front_x + back_x)/2, 0, left_z), (pit_length, wall_h, wall_t)),
+    ("manurePitRight", ((front_x + back_x)/2, 0, right_z), (pit_length, wall_h, wall_t)),
+]
+for name, centre, size in walls:
+    visual_box(name, centre, size, "uwmConcrete", pit)
+    for suffix, props in (("Collision", BUILDING), ("TipCollision", TIP)):
+        collider(name + suffix, lambda centre=centre, size=size: bpy.ops.mesh.primitive_cube_add(
+            size=1, location=gp(centre[0], centre[2], centre[1] + size[1]/2),
+            scale=(size[0], size[2], size[1])), props, cols)
+
+# Decorative pallet staging pad only: no pallet spawner or inventory (user's correction).
+px0, px1, pz0, pz1 = -14.5, -8.0, -4.5, 3.5
+visual_box("palletConcretePad", ((px0+px1)/2, -0.09, (pz0+pz1)/2),
+           (px1-px0, 0.10, pz1-pz0), "uwmConcreteLight", pad_root)
+line = 0.10
+for n, x in enumerate((px0+0.2, px1-0.2)):
+    visual_box("palletBoundaryX%d" % n, (x, 0.012, (pz0+pz1)/2),
+               (line, 0.006, pz1-pz0-0.4), "uwmYellow", pad_root)
+for n in range(4):
+    z = pz0 + 0.2 + n*(pz1-pz0-0.4)/3
+    visual_box("palletBayLine%d" % n, ((px0+px1)/2, 0.012, z),
+               (px1-px0-0.4, 0.006, line), "uwmYellow", pad_root)
 
 # bollard stripes: v runs up the bollard (0.4 m per yellow + black pair); tank ring bands get UVs too
 for ob in bpy.data.objects:
@@ -151,6 +200,14 @@ for ob in bpy.data.objects:
             g["box_uv"](ob, 0.4)
         elif ob.data.materials[0].name == "galv":
             g["box_uv"](ob, 1.0)
+
+# Bake collision dimensions into vertices, as required by static physics shapes.
+for ob in list(bpy.data.objects):
+    if ob.type == "MESH" and ob.get("i3D_collision", False):
+        bpy.ops.object.select_all(action="DESELECT")
+        ob.select_set(True)
+        bpy.context.view_layer.objects.active = ob
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 
 # 3. curves / text -> meshes, modifiers applied
 bpy.ops.object.select_all(action="DESELECT")
@@ -260,7 +317,7 @@ for m in root.find("Materials"):
 for f in list(files):
     if ":" in f.get("filename", "") and f.get("filename") not in ids:
         files.remove(f)
-# an empty link node for the base-game Farma 400 at the depot origin, LAST child of depot (so 0>5). UWMDepot loads
+# an empty link node for the base-game Farma 400 at the depot origin, LAST child of depot. UWMDepot loads
 # $data/placeables/unia/farma/farma400/farma400.i3d into it at runtime (nothing copied). NOT a ReferenceNode: GIANTS
 # Editor resolves those, but the game loaded it with 0 children (first in-game test, 2026-10-24: no silo).
 scene_el = root.find("Scene")
@@ -277,6 +334,8 @@ MAPPED = {"testAreaStart", "testAreaEnd", "clearAreaStart", "clearAreaWidth", "c
           "manureMarker", "officeTrigger", "officeMarker", "mapPosition"}
 
 
+mapping_paths = {}
+
 def walk(el, prefix):
     """prefix None = scene level ('0>'), 'n>' = children of a root node ('n>i'), else 'a>b|c'."""
     for i, c in enumerate(c for c in el if c.tag in NODE_TAGS):
@@ -288,7 +347,17 @@ def walk(el, prefix):
             path = f"{prefix}|{i}"
         if c.get("name") in MAPPED:
             print("MAPPING", c.get("name"), path)
+            mapping_paths[c.get("name")] = path
         walk(c, path)
 
 
 walk(scene_el, None)
+
+# Keep XML mappings valid when new visual roots change the exported child indices.
+xml_path = os.path.join(OUT_DIR, "depot.xml")
+if os.path.exists(xml_path):
+    xml_tree = ET.parse(xml_path)
+    for mapping in xml_tree.getroot().find("i3dMappings"):
+        mapping.set("node", mapping_paths[mapping.get("id")])
+    ET.indent(xml_tree, space="    ")
+    xml_tree.write(xml_path, encoding="utf-8", xml_declaration=True)

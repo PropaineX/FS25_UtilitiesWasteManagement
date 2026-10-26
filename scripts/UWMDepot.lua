@@ -1,6 +1,7 @@
 -- Utilities & Waste Management: the community depot (placeable specialization "uwmDepot").
--- One building: our slurry tank and office plus the base-game Farma 400, loaded from the game's own files.
--- Slurry is collected at the tank's coupling, manure under the Farma 400's loading pipe, and the office door opens
+-- One building: tank, manure pit, office, decorative pallet pad and decorative base-game Farma 400.
+-- The Farma model has no silo/storage specialization or active pickup; manure loads only at the pit.
+-- Slurry is collected at the tank's coupling, manure at the open end of the manure pit, and the office door opens
 -- the Utilities page. The two pickups are a game LoadingStation without storages of its own (flag uwmIsDepot):
 -- UWMPickup tells the load trigger what a farm may load and takes the liters live from the sellers' stock.
 -- Invoices only work while a depot stands on the map (UWMManager). Only one depot per map unless the server admin
@@ -108,7 +109,7 @@ function UWMDepot:onLoad(savegame)
             spec.farmaSharedLoadRequestId = sharedLoadRequestId
             link(spec.farmaNode, getChildAt(i3dNode, 0))
             delete(i3dNode)
-            -- hidden now; the manure load trigger's effect shows them while loading
+            -- The old silo loading effect is unused; manure now loads at the pit entrance.
             for _, name in ipairs(UWMDepot.FARMA_EFFECT_NODES) do
                 local node = findChild(spec.farmaNode, name)
                 if node ~= nil then

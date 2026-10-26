@@ -43,6 +43,7 @@ function newStorage(levels, capacity)
     return s
 end
 function Storage:getFillLevel(ft) return self.fillLevels[ft] or 0 end
+function Storage:getFillLevels() return self.fillLevels end
 function Storage:setFillLevel(l, ft) if self.fillLevels[ft] ~= nil then self.fillLevels[ft] = math.max(0, math.min(l, self.capacity)) end end
 function Storage:getCapacity() return self.capacity end
 function Storage:getFreeCapacity(ft) return self.capacity - self:getFillLevel(ft) end

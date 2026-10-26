@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no" ?>
 <modDesc descVersion="113">
     <author>PropaineX</author>
-    <version>0.5.0.0</version>
+    <version>0.6.0.0</version>
     <title>
         <en>Utilities &amp; Waste Management Pro Edition</en>
     </title>
@@ -14,7 +14,7 @@ Everything runs through the Community Depot (shop: Production, Selling points, $
 
 Every other farm is offered membership of the depot. Members and the owner share the depot's upkeep equally; it is taken every day. A member who can't pay builds up a debt; two months in a row ending in debt and the farm is suspended until it pays. A member can leave, but can't rejoin for 6 months; any debt is taken from its account when it leaves, even into the red. Farms that said no or are suspended can't send or accept invoices. Invoices they already paid can still be collected or ended.
 
-Electricity goes straight from the seller's power-producing productions into the buyer's productions the buyer picked, and is paid for as it arrives. Slurry and manure are paid for up front and collected by anyone on the buying farm at the depot: slurry at the tank's coupling, manure under the silo's loading pipe. Only what you paid for is offered, and the liters come out of the seller's own stock. Buyers can reserve what they paid for, so the seller can't use it. Liters that are never collected are refunded when the invoice ends. The depot office door opens the Utilities page.
+Electricity goes straight from the seller's power-producing productions into the buyer's productions the buyer picked, and is paid for as it arrives. Slurry and manure are paid for up front and collected by anyone on the buying farm at the depot: slurry at the tank's coupling, manure at the open end of the manure pit. Only what you paid for is offered, and the liters come out of the seller's own stock. Buyers can reserve what they paid for, so the seller can't use it. Liters that are never collected are refunded when the invoice ends. The depot office door opens the Utilities page.
 
 Multiplayer: everything runs on the server and only farm managers can trade.]]></en>
     </description>

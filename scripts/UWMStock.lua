@@ -14,6 +14,89 @@ UWMStock.KIND_PRODUCTION = 3
 -- true while this mod moves goods itself, so the reservation guard lets it through
 UWMStock.isMovingGoods = false
 
+-- ProductionChainManager handles automatic output sales/distribution outside LoadingStation.
+-- Give that synchronous update a storage view containing only unreserved output. Writes translate
+-- back to the real storage, so both the quantity sold and the money earned exclude held goods.
+-- The real storage is never emptied temporarily; loading stations and save/network state keep it.
+function UWMStock.updateProductionSales(chain, superFunc, ...)
+    local manager = UtilitiesWasteManagement.manager
+    if not chain.isServer or manager == nil then
+        return superFunc(chain, ...)
+    end
+    local heldByStorage = {}
+    for _, good in ipairs(UtilitiesWasteManagement.goods) do
+        local ft = good.fillTypeIndex
+        local farms = {}
+        for _, point in pairs(chain.productionPoints or {}) do
+            farms[point:getOwnerFarmId()] = true
+        end
+        for farmId in pairs(farms) do
+            local left = manager:getReservedLiters(farmId, ft)
+            if left > 0 then
+                for _, entry in ipairs(UWMStock.getSourceStorages(farmId, ft)) do
+                    local held = math.min(left, entry.storage:getFillLevel(ft) or 0)
+                    if held > 0 then
+                        heldByStorage[entry.storage] = heldByStorage[entry.storage] or {}
+                        heldByStorage[entry.storage][ft] = held
+                        left = left - held
+                    end
+                    if left <= 0 then break end
+                end
+            end
+        end
+    end
+
+    local replaced = {}
+    for _, point in pairs(chain.productionPoints or {}) do
+        local storage = point.storage
+        local held = heldByStorage[storage]
+        if held ~= nil then
+            local view = {}
+            function view:getFillLevel(ft)
+                return math.max((storage:getFillLevel(ft) or 0) - (held[ft] or 0), 0)
+            end
+            function view:getFillLevels()
+                local levels = {}
+                for ft in pairs(storage.fillLevels) do levels[ft] = self:getFillLevel(ft) end
+                return levels
+            end
+            function view:getCapacity(ft)
+                return math.max(storage:getCapacity(ft) - (held[ft] or 0), 0)
+            end
+            function view:setFillLevel(level, ft, ...)
+                return storage:setFillLevel(math.max(level, 0) + (held[ft] or 0), ft, ...)
+            end
+            setmetatable(view, {__index = function(_, key)
+                if key == "fillLevels" then return view:getFillLevels() end
+                local value = storage[key]
+                if type(value) == "function" then
+                    return function(_, ...) return value(storage, ...) end
+                end
+                return value
+            end})
+            table.insert(replaced, {point = point, storage = storage})
+            point.storage = view
+        end
+    end
+    -- Restore object identity even if another mod or the game throws during the update.
+    local function pack(...) return {n = select("#", ...), ...} end
+    local result = pack(pcall(superFunc, chain, ...))
+    for _, entry in ipairs(replaced) do entry.point.storage = entry.storage end
+    if not result[1] then error(result[2], 0) end
+    return unpack(result, 2, result.n)
+end
+
+function UWMStock.installProductionHooks()
+    if ProductionChainManager == nil or ProductionChainManager.update == nil then return end
+    ProductionChainManager.uwmSalesHandler = UWMStock.updateProductionSales
+    if not ProductionChainManager.uwmSalesHooked then
+        ProductionChainManager.uwmSalesHooked = true
+        ProductionChainManager.update = Utils.overwrittenFunction(ProductionChainManager.update, function(chain, superFunc, ...)
+            return ProductionChainManager.uwmSalesHandler(chain, superFunc, ...)
+        end)
+    end
+end
+
 local function getFillLevel(storage, fillTypeIndex)
     local fillLevel = storage:getFillLevel(fillTypeIndex)
     return fillLevel or 0
