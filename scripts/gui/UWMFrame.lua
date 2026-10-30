@@ -263,7 +263,11 @@ function UWMFrame.getDescriptionText(invoice, farmId)
         amount = UWM.formatAmount(invoice.fillTypeIndex, invoice.liters)
     end
     local key = invoice.buyerFarmId == farmId and "uwm_cell_descBuy" or "uwm_cell_descSell"
-    return string.format(getText(key), UWM.getGoodName(invoice.fillTypeIndex), amount)
+    local text = string.format(getText(key), UWM.getGoodName(invoice.fillTypeIndex), amount)
+    if invoice.discountPercent > 0 then
+        text = text .. string.format(getText("uwm_cell_discount"), UWMManager.formatPercent(invoice.discountPercent))
+    end
+    return text
 end
 
 -- money of the invoice: the agreed total, or what was paid so far for "all of it"
@@ -335,6 +339,84 @@ function UWMFrame.getInvoiceRow(invoice, farmId)
         UWMFrame.getStatusText(invoice, farmId),
         UWMFrame.getAmountText(invoice)
     }, 6, UWMFrame.getStatusColor(invoice, farmId)
+end
+
+-- an invoice as a card (Utilities page, user OK'd mock-up previews/menu_v4_incoming.png):
+-- {icon, title, sub, status, statusColor (UWMGui.COLOR name), amount}
+function UWMFrame.getInvoiceCard(invoice, farmId)
+    local UWM = UtilitiesWasteManagement
+    local ft = invoice.fillTypeIndex
+    local amount = invoice.amountMode == UWMInvoice.AMOUNT.ALL and getText("uwm_amount_all") or UWM.formatAmount(ft, invoice.liters)
+    local title = string.format(getText(invoice.isPallet and "uwm_card_titlePallets" or "uwm_card_title"), UWM.getGoodName(ft), amount)
+
+    local isBuyer = invoice.buyerFarmId == farmId
+    local parts = {
+        UWMFrame.getInvoiceNumber(invoice),
+        string.format(getText(isBuyer and "uwm_card_from" or "uwm_card_to"), UWMManager.getFarmName(invoice:getOtherFarmId(farmId))),
+        UWMFrame.getDayText(invoice.createdDay),
+        UWMFrame.getRepeatText(invoice)
+    }
+    if invoice.discountPercent > 0 then
+        table.insert(parts, string.format(getText("uwm_card_discount"), UWMManager.formatPercent(invoice.discountPercent)))
+    end
+    if UWMManager.getUsesDepot(ft) then
+        table.insert(parts, getText(UWMOrderDialog.getPickupPointKey(ft, invoice.isPallet)))
+    end
+
+    local color = "dim"
+    if invoice.state == STATE.PENDING then
+        color = invoice.creatorFarmId ~= farmId and "greenLight" or "grey"
+    elseif invoice.state == STATE.ACTIVE then
+        local toCollect = not invoice:getIsElectricity() and invoice.owedLiters > 0.5
+        color = (invoice.statusKey ~= "" or toCollect) and "orange" or "blue"
+    end
+
+    return {
+        icon = UWMGui.getGoodsIcon(ft, invoice.isPallet),
+        title = title,
+        sub = table.concat(parts, "  -  "),
+        status = UWMFrame.getStatusText(invoice, farmId),
+        statusColor = color,
+        amount = UWMFrame.getAmountText(invoice)
+    }
+end
+
+-- the four summary cards: waiting for you, running, at the depot for you, your goods for sale (texts)
+function UWMFrame.getSummary(manager, farmId)
+    local UWM = UtilitiesWasteManagement
+    local waiting, running, toCollect = 0, 0, 0
+    if manager ~= nil then
+        for _, invoice in ipairs(manager.invoices) do
+            local mine = invoice.sellerFarmId == farmId or invoice.buyerFarmId == farmId
+            if mine and invoice.state == STATE.PENDING and invoice.creatorFarmId ~= farmId then
+                waiting = waiting + 1
+            elseif mine and invoice.state == STATE.ACTIVE then
+                running = running + 1
+            end
+            if invoice.buyerFarmId == farmId and invoice.state == STATE.ACTIVE and UWMManager.getUsesDepot(invoice.fillTypeIndex) then
+                toCollect = toCollect + math.min(invoice.owedLiters, invoice.depotLiters)
+            end
+        end
+    end
+    local forSale = 0
+    if manager ~= nil then
+        for _, invoice in ipairs(manager.invoices) do
+            if invoice.sellerFarmId == farmId then
+                forSale = forSale + invoice.depotLiters
+            end
+        end
+        for _, listing in ipairs(manager.listings) do
+            if listing.farmId == farmId then
+                forSale = forSale + listing.depotLiters
+            end
+        end
+    end
+    return {
+        {value = tostring(waiting), sub = getText("uwm_sum_waitingSub")},
+        {value = tostring(running), sub = getText("uwm_sum_runningSub")},
+        {value = UWM.formatAmount(FillType.UNKNOWN, toCollect), sub = getText("uwm_sum_collectSub")},
+        {value = UWM.formatAmount(FillType.UNKNOWN, forSale), sub = getText("uwm_sum_forSaleSub")}
+    }
 end
 
 function UWMFrame.getListingTypeText(listing)
@@ -470,6 +552,7 @@ end
 
 function UWMFrame:onGuiSetupFinished()
     UWMFrame:superClass().onGuiSetupFinished(self)
+    UWMGui.applyStaticImages(self)
     for _, list in ipairs({self.invoiceList, self.marketList, self.dealsList, self.boardList}) do
         list:setDataSource(self)
         list:setDelegate(self)
@@ -558,7 +641,7 @@ function UWMFrame:showTab(tab, subTab)
         self.boardPaging:setState(self.subTab)
     end
 
-    for _, element in ipairs({self.invoiceHeader, self.invoiceHeaderLine, self.invoiceList, self.invoiceSlider}) do
+    for _, element in ipairs({self.invoiceList, self.invoiceSlider, self.summaryBox}) do
         setVisible(element, not isBoard)
     end
     for _, element in ipairs({self.boardTabBox, self.boardTabLine, self.boardPaging}) do
@@ -582,6 +665,24 @@ function UWMFrame:showTab(tab, subTab)
     FocusManager:setFocus(self:getActiveList())
 end
 
+-- the summary cards and the counts on the tabs
+function UWMFrame:updateSummary(manager, farmId)
+    local summary = UWMFrame.getSummary(manager, farmId)
+    for i, entry in ipairs(summary) do
+        if self.sumValue ~= nil and self.sumValue[i] ~= nil then
+            self.sumValue[i]:setText(entry.value)
+            self.sumSub[i]:setText(entry.sub)
+        end
+    end
+    local counts = {#self.lists.incoming, #self.lists.outgoing, #self.lists.myOrders}
+    local keys = {"uwm_tab_incoming", "uwm_tab_outgoing", "uwm_tab_board"}
+    for i, tabButton in ipairs(self.mainTabs or {}) do
+        if tabButton.setText ~= nil and keys[i] ~= nil then
+            tabButton:setText(string.format(getText("uwm_tab_count"), getText(keys[i]), counts[i]))
+        end
+    end
+end
+
 function UWMFrame:refresh()
     local farmId = UtilitiesWasteManagement.getLocalFarmId()
     local manager = UtilitiesWasteManagement.manager
@@ -595,6 +696,7 @@ function UWMFrame:refresh()
         self.depotText:setText(UWMFrame.getDepotStatusText(farmId))
     end
     self:updateBalance()
+    self:updateSummary(manager, farmId)
 
     -- keep the same item selected after a reload
     local selected = self.selected
@@ -664,7 +766,7 @@ function UWMFrame:updateButtons()
     local item = self.selected
 
     if isManager then
-        self.newButtonInfo.text = getText(self.tab == UWMFrame.TAB_BOARD and "uwm_button_newListing" or "uwm_button_new")
+        self.newButtonInfo.text = getText("uwm_button_new")
         table.insert(buttons, self.newButtonInfo)
     end
     if item ~= nil then
@@ -713,6 +815,17 @@ local function fillCells(cell, texts, colorIndex, color)
     end
 end
 
+function UWMFrame.fillInvoiceCard(cell, card)
+    UWMGui.applyStaticImages(cell)
+    UWMGui.setIcon(cell:getAttribute("icon"), card.icon)
+    cell:getAttribute("title"):setText(card.title)
+    cell:getAttribute("sub"):setText(card.sub)
+    local status = cell:getAttribute("status")
+    status:setText(card.status)
+    UWMGui.setTextColor(status, card.statusColor)
+    cell:getAttribute("amount"):setText(card.amount)
+end
+
 function UWMFrame:populateCellForItemInSection(list, section, index, cell)
     local item = self:getItems(list)[index]
     if item == nil then
@@ -720,7 +833,7 @@ function UWMFrame:populateCellForItemInSection(list, section, index, cell)
     end
     local farmId = UtilitiesWasteManagement.getLocalFarmId()
     if list == self.invoiceList then
-        fillCells(cell, UWMFrame.getInvoiceRow(item, farmId))
+        UWMFrame.fillInvoiceCard(cell, UWMFrame.getInvoiceCard(item, farmId))
     elseif list == self.marketList then
         fillCells(cell, UWMFrame.getMarketRow(item))
     elseif list == self.dealsList then
@@ -782,12 +895,9 @@ end
 
 -- Buttons
 
+-- the UWM CO-OP dialog: invoice / request / standing buy or sell order, on every tab
 function UWMFrame:onClickNew()
-    if self.tab == UWMFrame.TAB_BOARD then
-        UWMWizard.startListing()
-    else
-        UWMWizard.startNew()
-    end
+    UWMCoopDialog.show()
 end
 
 function UWMFrame:onClickMain()
@@ -876,6 +986,26 @@ function UWMFrame:askDelete(item)
 end
 
 -- everything about one invoice, for the Details box
+-- discount: the percent and the money it takes off, worded for the seller or the buyer, then what is paid.
+-- A set amount: worked out from the liters (per delivery on a contract); "all of it": from what was paid so far.
+function UWMFrame.addDiscountLines(lines, invoice, farmId)
+    if invoice.discountPercent <= 0 then
+        return
+    end
+    local UWM = UtilitiesWasteManagement
+    local isBuyer = invoice.buyerFarmId == farmId
+    local discount, paid
+    if invoice.amountMode == UWMInvoice.AMOUNT.FIXED then
+        discount, paid = invoice:getDiscount(invoice.liters), invoice:getPrice(invoice.liters)
+    else
+        discount, paid = invoice:getDiscountOnPaid(invoice.totalMoney), invoice.totalMoney
+    end
+    local percent = UWMManager.formatPercent(invoice.discountPercent)
+    table.insert(lines, string.format(getText(isBuyer and "uwm_details_discountBuyer" or "uwm_details_discountSeller"),
+        percent, UWM.formatMoney(discount)))
+    table.insert(lines, string.format(getText(isBuyer and "uwm_details_youPay" or "uwm_details_buyerPays"), UWM.formatMoney(paid)))
+end
+
 function UWMFrame.getDetailsText(invoice, farmId)
     local UWM = UtilitiesWasteManagement
     local ft = invoice.fillTypeIndex
@@ -896,6 +1026,7 @@ function UWMFrame.getDetailsText(invoice, farmId)
     local ordered = invoice.amountMode == UWMInvoice.AMOUNT.ALL and getText("uwm_amount_all") or UWM.formatAmount(ft, invoice.liters)
     add("uwm_details_ordered", ordered)
     add("uwm_details_price", UWMFrame.getPriceText(ft, invoice.pricePer1000))
+    UWMFrame.addDiscountLines(lines, invoice, farmId)
     add("uwm_details_repeats", UWMFrame.getRepeatText(invoice))
     if invoice.reserve then
         table.insert(lines, getText("uwm_summary_reserved"))

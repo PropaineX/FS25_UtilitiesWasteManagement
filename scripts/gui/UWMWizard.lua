@@ -4,6 +4,8 @@
 --   -> buyer's choices (reserve, or the productions that get the electricity) -> confirm.
 -- New standing order: offer (sell) or wanted (buy) -> good -> total amount -> price -> (wanted electricity: the
 --   productions that get it) -> confirm. Trading on one: amount -> (buying electricity: productions) -> confirm.
+-- The UWM CO-OP form (UWMOrderDialog) fills one invoice / standing order in one screen and joins these steps at
+-- startForm; the old start functions (startNew / startListing) are no longer opened by the page.
 -- Author: PropaineX
 
 UWMWizard = {}
@@ -58,6 +60,103 @@ function UWMWizard.startAccept(invoice)
     else
         wizard:confirmAccept()
     end
+end
+
+----------------------------------------------------------------------------------------------------------------
+-- The UWM CO-OP form (gui/UWMOrderDialog): one item per invoice. The form gives the choices in one go, the rest
+-- (buyer's reserve / electricity productions, confirm, request to the server) runs through the steps below.
+-- form = {mode, otherFarmId, fillTypeIndex, amountAll, liters, pricePer1000, discountPercent, repeatDays}
+-- (discount: invoices and requests only, not standing orders)
+----------------------------------------------------------------------------------------------------------------
+
+UWMWizard.FORM = {
+    BILL = 1,       -- invoice a farm: we sell, they pay when they accept
+    REQUEST = 2,    -- request an invoice: we buy, they approve
+    WANTED = 3,     -- standing buy order on the market
+    OFFER = 4       -- standing sell order on the market
+}
+
+function UWMWizard.getFormIsListing(mode)
+    return mode == UWMWizard.FORM.WANTED or mode == UWMWizard.FORM.OFFER
+end
+
+-- nil = the form can be sent, else the l10n key of what's missing
+function UWMWizard.getFormError(form)
+    if not UWMWizard.getFormIsListing(form.mode) and form.otherFarmId == nil then
+        return "uwm_error_formNoFarm"
+    end
+    if not UtilitiesWasteManagement.getIsTradable(form.fillTypeIndex) then
+        return "uwm_error_formNoGood"
+    end
+    if form.isPallet and not UWMPallets.getIsPalletGood(form.fillTypeIndex) then
+        return "uwm_error_formNoGood"
+    end
+    local allowAll = not UWMWizard.getFormIsListing(form.mode)
+    if not (allowAll and form.amountAll) and (form.liters == nil or form.liters <= 0) then
+        return "uwm_error_badAmount"
+    end
+    if form.pricePer1000 == nil or form.pricePer1000 < 0 then
+        return "uwm_error_badPrice"
+    end
+    local discount = form.discountPercent or 0
+    if not UWMWizard.getFormIsListing(form.mode) and not (discount >= 0 and discount < 100) then
+        return "uwm_error_badDiscount"
+    end
+    return nil
+end
+
+function UWMWizard.startForm(form)
+    local errorKey = UWMWizard.getFormError(form)
+    if errorKey ~= nil then
+        InfoDialog.show(getText(errorKey))
+        return nil
+    end
+
+    local wizard = UWMWizard.new()
+    local invoice = wizard.invoice
+    invoice.fillTypeIndex = form.fillTypeIndex
+    invoice.pricePer1000 = form.pricePer1000
+    invoice.isPallet = form.isPallet == true
+    invoice.palletSize = form.palletSize or UWMPallets.SIZES[1]
+
+    if UWMWizard.getFormIsListing(form.mode) then
+        wizard.listingKind = form.mode == UWMWizard.FORM.OFFER and UWMListing.KIND.OFFER or UWMListing.KIND.WANTED
+        invoice.liters = form.liters
+        if wizard.listingKind == UWMListing.KIND.WANTED and invoice.fillTypeIndex == FillType.ELECTRICCHARGE then
+            wizard:askTargets(function()
+                wizard:confirmListing()
+            end)
+        else
+            wizard:confirmListing()
+        end
+        return wizard
+    end
+
+    wizard.isBill = form.mode == UWMWizard.FORM.BILL
+    if wizard.isBill then
+        invoice.sellerFarmId = wizard.farmId
+        invoice.buyerFarmId = form.otherFarmId
+    else
+        invoice.sellerFarmId = form.otherFarmId
+        invoice.buyerFarmId = wizard.farmId
+    end
+    if form.amountAll then
+        invoice.amountMode = UWMInvoice.AMOUNT.ALL
+    else
+        invoice.amountMode = UWMInvoice.AMOUNT.FIXED
+        invoice.liters = form.liters
+    end
+    invoice.repeatDays = form.repeatDays or UWMInvoice.REPEAT_ONCE
+    invoice.discountPercent = form.discountPercent or 0
+
+    if wizard.isBill then
+        wizard:confirmNew()
+    else
+        wizard:askBuyerOptions(function()
+            wizard:confirmNew()
+        end)
+    end
+    return wizard
 end
 
 ----------------------------------------------------------------------------------------------------------------
@@ -227,10 +326,15 @@ function UWMWizard:askRepeat()
     end, getText("uwm_wizard_title"), getText("uwm_wizard_repeat"), options)
 end
 
--- reserve (manure / slurry) or the receiving productions (electricity)
+-- the receiving productions (electricity). Manure / slurry needs no choice any more: the seller's goods wait in the
+-- depot for the buyer (user's rule 2026-10-28), so there is nothing left to reserve.
 function UWMWizard:askBuyerOptions(onDone)
     if self.invoice.fillTypeIndex == FillType.ELECTRICCHARGE then
         self:askTargets(onDone)
+        return
+    end
+    if UWMManager.getUsesDepot(self.invoice.fillTypeIndex) then
+        onDone()
         return
     end
     local options = {getText("uwm_wizard_reserveNo"), getText("uwm_wizard_reserveYes")}
@@ -309,6 +413,7 @@ function UWMWizard.getSummary(invoice, farmId, numTargets)
             UWM.formatMoney(invoice:getPrice(invoice.liters))))
     end
     table.insert(lines, string.format(getText(unitKey(invoice, "uwm_summary_price")), UWM.formatMoney(invoice.pricePer1000)))
+    UWMFrame.addDiscountLines(lines, invoice, farmId)
 
     local repeatKey = "uwm_repeat_once"
     if invoice.repeatDays == UWMInvoice.REPEAT_DAILY then
@@ -397,6 +502,8 @@ function UWMWizard:confirmListing()
             listing.fillTypeIndex = invoice.fillTypeIndex
             listing.liters = invoice.liters
             listing.pricePer1000 = invoice.pricePer1000
+            listing.isPallet = invoice.isPallet
+            listing.palletSize = invoice.palletSize
             UWMRequestEvent.sendRequest(UWMManager.ACTION.POST_LISTING, {listing = listing, targetPlaceables = self.targetPlaceables})
         end
     end, self, table.concat(lines, "\n"), getText("uwm_wizard_listingTitle"))

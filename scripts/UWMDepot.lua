@@ -1,5 +1,5 @@
 -- Utilities & Waste Management: the community depot (placeable specialization "uwmDepot").
--- One building: tank, manure pit, office, decorative pallet pad and decorative base-game Farma 400.
+-- One building: tank, manure pit, office, pallet pad (pallets spawn there) and the base-game Farma 400 (bulk pickup).
 -- The Farma model has no silo/storage specialization or active pickup; manure loads only at the pit.
 -- Slurry is collected at the tank's coupling, manure at the open end of the manure pit, and the office door opens
 -- the Utilities page. The two pickups are a game LoadingStation without storages of its own (flag uwmIsDepot):
@@ -49,6 +49,7 @@ function UWMDepot.registerXMLPaths(schema, basePath)
     schema:register(XMLValueType.NODE_INDEX, basePath .. ".uwmDepot#officeTrigger", "Player trigger at the office door (opens the Utilities page)")
     schema:register(XMLValueType.NODE_INDEX, basePath .. ".uwmDepot#farmaNode", "The referenced Farma 400 (its pipe effect meshes are kept hidden)")
     LoadingStation.registerXMLPaths(schema, basePath .. ".uwmDepot.loadingStation")
+    PalletSpawner.registerXMLPaths(schema, basePath .. ".uwmDepot.palletSpawner")
     schema:setXMLSpecializationType()
 end
 
@@ -143,6 +144,26 @@ function UWMDepot:onLoad(savegame)
 
     spec.officeTrigger = xmlFile:getValue("placeable.uwmDepot#officeTrigger", nil, self.components, self.i3dMappings)
     spec.activatable = UWMDepotActivatable.new(self)
+
+    -- the pallet pad (server spawns): paid pallet goods appear here for the buyer
+    if self.isServer and PalletSpawner ~= nil then
+        spec.palletSpawner = PalletSpawner.new(self.baseDirectory)
+        if not spec.palletSpawner:load(self.components, xmlFile, "placeable.uwmDepot.palletSpawner", self.customEnvironment, self.i3dMappings) then
+            Logging.xmlWarning(xmlFile, "%s pallet pad could not be loaded, pallet goods can't be handed out", UtilitiesWasteManagement.TAG)
+            spec.palletSpawner = nil
+        end
+    end
+end
+
+-- the pallet spawner of the first depot on the map (server), nil without one
+function UWMDepot.getPalletSpawner()
+    for _, depot in ipairs(UWMDepot.getDepots()) do
+        local spec = getSpec(depot)
+        if spec ~= nil and spec.palletSpawner ~= nil then
+            return spec.palletSpawner
+        end
+    end
+    return nil
 end
 
 function UWMDepot:onFinalizePlacement()

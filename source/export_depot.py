@@ -139,6 +139,11 @@ empty("slurryMarker", gp(11.8, -15.6, 0.0), trig)
 trigger_box("manureTrigger", (-16.0, 2.5, -17.175), (5.0, 5.0, 8.0), FILL_TRIGGER)
 empty("manureDischarge", gp(-14.8, -17.175, 3.5), trig)
 empty("manureMarker", gp(-16.0, -17.175, 0.0), trig)
+# bulk (user, 2026-10-28: "available from the silo"): under the Farma 400's loading pipe on its +z side, where the
+# 0.4 manure pickup was (x -7..7, z 3.5..7.5); a trailer drives along x under the pipe
+trigger_box("siloTrigger", (0.0, 2.5, 5.5), (14.0, 5.0, 4.0), FILL_TRIGGER)
+empty("siloDischarge", gp(0.0, 5.5, 4.5), trig)
+empty("siloMarker", gp(0.0, 5.5, 0.0), trig)
 # office door (door face at game x -12.1, z -8.05, opening to -x)
 trigger_box("officeTrigger", (-13.3, 1.0, -8.05), (2.0, 2.0, 2.4), PLAYER_TRIGGER)
 empty("officeMarker", gp(-13.3, -8.05, 0.0), trig)           # the shop-basket icon on the ground at the door
@@ -180,8 +185,13 @@ for name, centre, size in walls:
             size=1, location=gp(centre[0], centre[2], centre[1] + size[1]/2),
             scale=(size[0], size[2], size[1])), props, cols)
 
-# Decorative pallet staging pad only: no pallet spawner or inventory (user's correction).
+# Pallet pad: paid pallets spawn here for the buyer (user, 2026-10-28; was decorative before). One spawn line per
+# bay, along x through the bay's middle (bays are split along z by the yellow lines below).
 px0, px1, pz0, pz1 = -14.5, -8.0, -4.5, 3.5
+for n in range(3):
+    bz = pz0 + 0.2 + (n + 0.5) * (pz1 - pz0 - 0.4) / 3
+    empty("pallet%dStart" % (n + 1), gp(px0 + 0.4, bz, 0.1), trig)
+    empty("pallet%dEnd" % (n + 1), gp(px1 - 0.4, bz, 0.1), trig)
 visual_box("palletConcretePad", ((px0+px1)/2, -0.09, (pz0+pz1)/2),
            (px1-px0, 0.10, pz1-pz0), "uwmConcreteLight", pad_root)
 line = 0.10
@@ -331,7 +341,8 @@ NODE_TAGS = {"TransformGroup", "Shape", "Light", "Camera", "Dynamic", "Audio", "
 MAPPED = {"testAreaStart", "testAreaEnd", "clearAreaStart", "clearAreaWidth", "clearAreaHeight", "levelAreaStart",
           "levelAreaWidth", "levelAreaHeight", "tipOcclusionStart", "tipOcclusionEnd", "farma400", "office", "tank",
           "triggers", "slurryTrigger", "slurryDischarge", "slurryMarker", "manureTrigger", "manureDischarge",
-          "manureMarker", "officeTrigger", "officeMarker", "mapPosition"}
+          "manureMarker", "siloTrigger", "siloDischarge", "siloMarker", "officeTrigger", "officeMarker", "mapPosition",
+          "pallet1Start", "pallet1End", "pallet2Start", "pallet2End", "pallet3Start", "pallet3End"}
 
 
 mapping_paths = {}

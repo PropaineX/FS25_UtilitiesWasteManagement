@@ -35,27 +35,54 @@
 
         <GuiElement profile="fs25_subCategorySelectorTabbedContainer">
 
-            <!-- INCOMING / OUTGOING: invoices -->
-            <GuiElement profile="fs25_statisticsHeaderBox" position="-63px 0px" id="invoiceHeader">
-                <Text profile="uwm_headerCell" position="20px -14px"   size="120px 32px" text="$l10n_uwm_column_number"/>
-                <Text profile="uwm_headerCell" position="150px -14px"  size="130px 32px" text="$l10n_uwm_column_day"/>
-                <Text profile="uwm_headerCell" position="290px -14px"  size="300px 32px" text="$l10n_uwm_column_farm"/>
-                <Text profile="uwm_headerCell" position="600px -14px"  size="380px 32px" text="$l10n_uwm_column_description"/>
-                <Text profile="uwm_headerCell" position="990px -14px"  size="150px 32px" text="$l10n_uwm_column_repeat"/>
-                <Text profile="uwm_headerCell" position="1150px -14px" size="240px 32px" text="$l10n_uwm_column_status"/>
-                <Text profile="uwm_headerCell" position="1400px -14px" size="150px 32px" text="$l10n_uwm_column_amount"/>
+            <!-- INCOMING / OUTGOING (UWM CO-OP theme, mock-up previews/menu_v4_incoming.png, user OK'd 2026-10-28):
+                 four summary cards, then every invoice as a card (goods icon tile, title, detail line, status,
+                 amount, arrow). Shapes / icons = cells of gui/uwm_ui.dds ("uwmImg_<cell>" names, UWMGui.lua). -->
+            <GuiElement profile="uwm_summaryBox" id="summaryBox">
+                <GuiElement profile="uwm_sumCard" position="0px 0px">
+                    <Bitmap profile="uwm_sumEdge" name="uwmImg_solid"/>
+                    <Bitmap profile="uwm_sumBg" name="uwmImg_solid"/>
+                    <Bitmap profile="uwm_sumStripGreen" name="uwmImg_solid"/>
+                    <Text profile="uwm_sumLabel" text="$l10n_uwm_sum_waiting"/>
+                    <Text profile="uwm_sumValue" id="sumValue[1]"/>
+                    <Text profile="uwm_sumSub" id="sumSub[1]"/>
+                </GuiElement>
+                <GuiElement profile="uwm_sumCard" position="399px 0px">
+                    <Bitmap profile="uwm_sumEdge" name="uwmImg_solid"/>
+                    <Bitmap profile="uwm_sumBg" name="uwmImg_solid"/>
+                    <Bitmap profile="uwm_sumStripBlue" name="uwmImg_solid"/>
+                    <Text profile="uwm_sumLabel" text="$l10n_uwm_sum_running"/>
+                    <Text profile="uwm_sumValue" id="sumValue[2]"/>
+                    <Text profile="uwm_sumSub" id="sumSub[2]"/>
+                </GuiElement>
+                <GuiElement profile="uwm_sumCard" position="798px 0px">
+                    <Bitmap profile="uwm_sumEdge" name="uwmImg_solid"/>
+                    <Bitmap profile="uwm_sumBg" name="uwmImg_solid"/>
+                    <Bitmap profile="uwm_sumStripOrange" name="uwmImg_solid"/>
+                    <Text profile="uwm_sumLabel" text="$l10n_uwm_sum_collect"/>
+                    <Text profile="uwm_sumValue" id="sumValue[3]"/>
+                    <Text profile="uwm_sumSub" id="sumSub[3]"/>
+                </GuiElement>
+                <GuiElement profile="uwm_sumCard" position="1197px 0px">
+                    <Bitmap profile="uwm_sumEdge" name="uwmImg_solid"/>
+                    <Bitmap profile="uwm_sumBg" name="uwmImg_solid"/>
+                    <Bitmap profile="uwm_sumStripGrey" name="uwmImg_solid"/>
+                    <Text profile="uwm_sumLabel" text="$l10n_uwm_sum_forSale"/>
+                    <Text profile="uwm_sumValue" id="sumValue[4]"/>
+                    <Text profile="uwm_sumSub" id="sumSub[4]"/>
+                </GuiElement>
             </GuiElement>
-            <ThreePartBitmap profile="fs25_lineSeparatorTop" position="-63px -48px" size="100% 1dp" id="invoiceHeaderLine"/>
-            <SmoothList profile="uwm_list" id="invoiceList" position="-63px -50px" size="100% 672px">
-                <ListItem profile="uwm_listItem">
-                    <ThreePartBitmap profile="uwm_listItemBg" name="alternating"/>
-                    <Text profile="uwm_rowCell" position="20px 0px"   size="120px 32px" name="c1"/>
-                    <Text profile="uwm_rowCell" position="150px 0px"  size="130px 32px" name="c2"/>
-                    <Text profile="uwm_rowCell" position="290px 0px"  size="300px 32px" name="c3"/>
-                    <Text profile="uwm_rowCellDim" position="600px 0px"  size="380px 32px" name="c4"/>
-                    <Text profile="uwm_rowCell" position="990px 0px"  size="150px 32px" name="c5"/>
-                    <Text profile="uwm_rowCellBold" position="1150px 0px" size="240px 32px" name="c6"/>
-                    <Text profile="uwm_rowCellBold" position="1400px 0px" size="150px 32px" name="c7"/>
+            <SmoothList profile="uwm_list" id="invoiceList" position="-63px -100px" size="100% 616px" listItemSpacing="12px">
+                <ListItem profile="uwm_cardItem">
+                    <Bitmap profile="uwm_cardEdge" name="uwmImg_solid"/>
+                    <Bitmap profile="uwm_cardBg" name="uwmImg_solid"/>
+                    <Bitmap profile="uwm_cardTile" name="uwmImg_tile"/>
+                    <Bitmap profile="uwm_cardIcon" name="icon"/>
+                    <Text profile="uwm_cardTitle" name="title"/>
+                    <Text profile="uwm_cardSub" name="sub"/>
+                    <Text profile="uwm_cardStatus" name="status"/>
+                    <Text profile="uwm_cardAmount" name="amount"/>
+                    <Bitmap profile="uwm_cardArrow" name="uwmImg_arrow"/>
                 </ListItem>
             </SmoothList>
             <Text profile="uwm_emptyText" position="540px -350px" id="invoiceEmpty"/>
@@ -171,6 +198,146 @@
     </GuiElement>
 
     <GUIProfiles>
+        <!-- UWM CO-OP theme: summary cards -->
+        <Profile name="uwm_summaryBox" extends="emptyPanel" with="anchorTopLeft">
+            <position value="-63px 0px"/>
+            <size value="1580px 84px"/>
+        </Profile>
+        <Profile name="uwm_sumCard" extends="emptyPanel" with="anchorTopLeft">
+            <size value="383px 84px"/>
+        </Profile>
+        <Profile name="uwm_sumEdge" extends="baseReference" with="anchorTopLeft">
+            <size value="383px 84px"/>
+            <imageColor value="0.180 0.188 0.169 1"/>
+        </Profile>
+        <Profile name="uwm_sumBg" extends="baseReference" with="anchorTopLeft">
+            <position value="1px -1px"/>
+            <size value="381px 82px"/>
+            <imageColor value="0.110 0.114 0.106 1"/>
+        </Profile>
+        <Profile name="uwm_sumStripGreen" extends="baseReference" with="anchorTopLeft">
+            <position value="1px -12px"/>
+            <size value="4px 60px"/>
+            <imageColor value="0.651 0.784 0.235 1"/>
+        </Profile>
+        <Profile name="uwm_sumStripBlue" extends="uwm_sumStripGreen">
+            <imageColor value="0.431 0.667 0.902 1"/>
+        </Profile>
+        <Profile name="uwm_sumStripOrange" extends="uwm_sumStripGreen">
+            <imageColor value="0.902 0.667 0.235 1"/>
+        </Profile>
+        <Profile name="uwm_sumStripGrey" extends="uwm_sumStripGreen">
+            <imageColor value="0.667 0.667 0.647 1"/>
+        </Profile>
+        <Profile name="uwm_sumLabel" extends="baseReference" with="anchorTopLeft">
+            <position value="20px -10px"/>
+            <size value="350px 22px"/>
+            <textSize value="13px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textColor value="0.431 0.439 0.412 1"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwm_sumValue" extends="baseReference" with="anchorTopLeft">
+            <position value="20px -34px"/>
+            <size value="170px 40px"/>
+            <textSize value="28px"/>
+            <textBold value="true"/>
+            <textColor value="$preset_colorWhite"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwm_sumSub" extends="baseReference" with="anchorTopLeft">
+            <position value="190px -38px"/>
+            <size value="180px 34px"/>
+            <textSize value="15px"/>
+            <textColor value="0.667 0.667 0.647 1"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+
+        <!-- an invoice card: selected = green outline + soft fill + solid green tile with a dark icon -->
+        <Profile name="uwm_cardItem" extends="baseReference" with="anchorTopStretchingX">
+            <height value="94px"/>
+            <imageColor value="0 0 0 0"/>
+            <imageSelectedColor value="0 0 0 0"/>
+            <imageFocusedColor value="0 0 0 0"/>
+            <imageHighlightedColor value="0 0 0 0"/>
+        </Profile>
+        <Profile name="uwm_cardEdge" extends="baseReference" with="anchorTopLeft">
+            <size value="1560px 94px"/>
+            <imageColor value="0.180 0.188 0.169 1"/>
+            <imageSelectedColor value="0.651 0.784 0.235 1"/>
+            <imageHighlightedColor value="0.420 0.500 0.180 1"/>
+        </Profile>
+        <Profile name="uwm_cardBg" extends="baseReference" with="anchorTopLeft">
+            <position value="2px -2px"/>
+            <size value="1556px 90px"/>
+            <imageColor value="0.110 0.114 0.106 1"/>
+            <imageSelectedColor value="0.196 0.235 0.110 1"/>
+            <imageHighlightedColor value="0.150 0.170 0.110 1"/>
+        </Profile>
+        <Profile name="uwm_cardTile" extends="baseReference" with="anchorTopLeft">
+            <position value="18px -17px"/>
+            <size value="60px 60px"/>
+            <imageColor value="0.157 0.173 0.133 1"/>
+            <imageSelectedColor value="0.525 0.694 0.067 1"/>
+        </Profile>
+        <Profile name="uwm_cardIcon" extends="baseReference" with="anchorTopLeft">
+            <position value="24px -23px"/>
+            <size value="48px 48px"/>
+            <imageColor value="0.651 0.784 0.235 1"/>
+            <imageSelectedColor value="0.110 0.133 0.047 1"/>
+        </Profile>
+        <Profile name="uwm_cardTitle" extends="baseReference" with="anchorTopLeft">
+            <position value="100px -16px"/>
+            <size value="1000px 32px"/>
+            <textSize value="21px"/>
+            <textBold value="true"/>
+            <textColor value="$preset_colorWhite"/>
+            <textSelectedColor value="$preset_colorWhite"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+            <textLayoutMode value="scrolling"/>
+        </Profile>
+        <Profile name="uwm_cardSub" extends="baseReference" with="anchorTopLeft">
+            <position value="100px -50px"/>
+            <size value="1000px 26px"/>
+            <textSize value="16px"/>
+            <textColor value="0.667 0.667 0.647 1"/>
+            <textSelectedColor value="0.804 0.804 0.784 1"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+            <textLayoutMode value="scrolling"/>
+        </Profile>
+        <Profile name="uwm_cardStatus" extends="baseReference" with="anchorTopLeft">
+            <position value="1100px -30px"/>
+            <size value="240px 34px"/>
+            <textSize value="15px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textAlignment value="right"/>
+            <textVerticalAlignment value="middle"/>
+            <textLayoutMode value="scrolling"/>
+        </Profile>
+        <Profile name="uwm_cardAmount" extends="baseReference" with="anchorTopLeft">
+            <position value="1350px -26px"/>
+            <size value="150px 42px"/>
+            <textSize value="23px"/>
+            <textBold value="true"/>
+            <textColor value="$preset_colorWhite"/>
+            <textSelectedColor value="$preset_colorWhite"/>
+            <textAlignment value="right"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwm_cardArrow" extends="baseReference" with="anchorTopLeft">
+            <position value="1516px -33px"/>
+            <size value="28px 28px"/>
+            <imageColor value="0.431 0.439 0.412 1"/>
+            <imageSelectedColor value="0.651 0.784 0.235 1"/>
+        </Profile>
+
         <Profile name="uwm_list" extends="emptyPanel" with="pivotTopLeft">
             <size value="100% 672px"/>
         </Profile>

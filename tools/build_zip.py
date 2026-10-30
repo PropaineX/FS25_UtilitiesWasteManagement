@@ -9,7 +9,9 @@ import zipfile
 project = pathlib.Path(__file__).resolve().parent.parent
 out = pathlib.Path(sys.argv[1])
 
-files = ["modDesc.xml", "icon_UtilitiesWasteManagement.dds", "gui/UWMFrame.xml", "gui/uwm_tabIcon.dds"]
+files = ["modDesc.xml", "icon_UtilitiesWasteManagement.dds"]
+files += sorted(p.relative_to(project).as_posix() for p in (project / "gui").glob("*.xml"))
+files += sorted(p.relative_to(project).as_posix() for p in (project / "gui").glob("*.dds"))
 files += sorted(p.relative_to(project).as_posix() for p in (project / "scripts").rglob("*.lua"))
 # the depot (0.4): placeable xml, i3d + shapes, shop picture, textures
 depot = project / "placeables" / "depot"

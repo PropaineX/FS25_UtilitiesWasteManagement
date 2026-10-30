@@ -1,0 +1,690 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<!-- UWM CO-OP form: new invoice / request / standing buy or sell order, one item each, pickup always the depot.
+     Look = mock-up previews/invoice_form_style_v6.png (user OK'd 2026-10-28): outlined cards, icon tiles, the selection
+     = green outline + soft fill + solid green tile. Fills, tiles and icons are cells of gui/uwm_ui.dds: elements named
+     "uwmImg_<cell>" get theirs in UWMOrderDialog.lua (list rows when they are filled). Sizes for 1920 x 1080. -->
+<GUI onOpen="onOpen" onClose="onClose" onCreate="onCreate">
+    <GuiElement profile="newLayer"/>
+    <Bitmap profile="dialogFullscreenBg"/>
+
+    <GuiElement profile="uwmFormDialogBg" id="dialogElement">
+        <ThreePartBitmap profile="fs25_dialogBgMiddle"/>
+        <ThreePartBitmap profile="fs25_dialogBgTop"/>
+        <ThreePartBitmap profile="fs25_dialogBgBottom"/>
+
+        <GuiElement profile="fs25_dialogContentContainer">
+            <GuiElement profile="uwmFormContent">
+                <!-- header: our icon on a green tile, UWM CO-OP, the page title, the issuer card -->
+                <Bitmap profile="uwmFormHeadTile" name="uwmImg_tile"/>
+                <Bitmap profile="uwmFormHeadIcon" id="headIcon"/>
+                <Text profile="uwmFormBrand" text="$l10n_uwm_coop_title"/>
+                <Text profile="uwmFormTitle" id="titleText"/>
+                <Bitmap profile="uwmFormIssuerEdge" name="uwmImg_solid"/>
+                <Bitmap profile="uwmFormIssuerBg" name="uwmImg_solid"/>
+                <Text profile="uwmFormIssuerLabel" text="$l10n_uwm_form_issuerLabel"/>
+                <Text profile="uwmFormIssuerName" id="issuerText"/>
+                <Bitmap profile="uwmFormRule" position="0px -72px" name="uwmImg_solid"/>
+
+                <!-- customer / seller / market -->
+                <GuiElement profile="uwmFormColumn" position="0px -86px">
+                    <Bitmap profile="uwmFormCardEdge" name="uwmImg_solid"/>
+                    <Bitmap profile="uwmFormCardBg" name="uwmImg_solid"/>
+                    <Text profile="uwmFormCardTitle" id="farmColumnTitle"/>
+                    <Bitmap profile="uwmFormCardRule" name="uwmImg_solid"/>
+                    <SmoothList profile="uwmFormColumnList" id="farmList" selectedWithoutFocus="true">
+                        <ListItem profile="uwmFormPickItem">
+                            <Bitmap profile="uwmFormSelOutline" name="uwmImg_solid"/>
+                            <Bitmap profile="uwmFormSelFill" name="uwmImg_solid"/>
+                            <Bitmap profile="uwmFormPickTile" name="uwmImg_tile"/>
+                            <Bitmap profile="uwmFormPickIcon" name="icon"/>
+                            <Text profile="uwmFormPickName" name="name"/>
+                        </ListItem>
+                    </SmoothList>
+                    <Text profile="uwmFormColumnNote" id="farmNote"/>
+                </GuiElement>
+
+                <!-- goods: our three, Bulk >, Pallet > -->
+                <GuiElement profile="uwmFormColumn" position="352px -86px">
+                    <Bitmap profile="uwmFormCardEdge" name="uwmImg_solid"/>
+                    <Bitmap profile="uwmFormCardBg" name="uwmImg_solid"/>
+                    <Text profile="uwmFormCardTitle" text="$l10n_uwm_form_goods"/>
+                    <Bitmap profile="uwmFormCardRule" name="uwmImg_solid"/>
+                    <SmoothList profile="uwmFormColumnList" id="goodsList" selectedWithoutFocus="true" onClick="onClickGoods">
+                        <ListItem profile="uwmFormPickItem">
+                            <Bitmap profile="uwmFormSelOutline" name="uwmImg_solid"/>
+                            <Bitmap profile="uwmFormSelFill" name="uwmImg_solid"/>
+                            <Bitmap profile="uwmFormPickTile" name="uwmImg_tile"/>
+                            <Bitmap profile="uwmFormPickIcon" name="icon"/>
+                            <Text profile="uwmFormPickName" name="name"/>
+                            <Text profile="uwmFormPickPrice" name="price"/>
+                            <Bitmap profile="uwmFormPickArrow" name="arrow"/>
+                        </ListItem>
+                    </SmoothList>
+                </GuiElement>
+
+                <!-- pickup: always the depot -->
+                <GuiElement profile="uwmFormColumn" position="704px -86px">
+                    <Bitmap profile="uwmFormCardEdge" name="uwmImg_solid"/>
+                    <Bitmap profile="uwmFormCardBg" name="uwmImg_solid"/>
+                    <Text profile="uwmFormCardTitle" text="$l10n_uwm_form_pickup"/>
+                    <Bitmap profile="uwmFormCardRule" name="uwmImg_solid"/>
+                    <Bitmap profile="uwmFormDepotOutline" name="uwmImg_solid"/>
+                    <Bitmap profile="uwmFormDepotFill" name="uwmImg_solid"/>
+                    <Bitmap profile="uwmFormDepotTile" name="uwmImg_tile"/>
+                    <Bitmap profile="uwmFormDepotIcon" name="uwmImg_depot"/>
+                    <Text profile="uwmFormDepotName" id="depotName"/>
+                    <Text profile="uwmFormDepotFixed" text="$l10n_uwm_form_fixed"/>
+                    <Text profile="uwmFormInfoKey" position="20px -112px" id="infoKey1"/>
+                    <Text profile="uwmFormInfoValue" position="-20px -112px" id="infoValue1"/>
+                    <Text profile="uwmFormInfoKey" position="20px -142px" id="infoKey2"/>
+                    <Text profile="uwmFormInfoValue" position="-20px -142px" id="infoValue2"/>
+                    <Text profile="uwmFormInfoKey" position="20px -172px" id="infoKey3"/>
+                    <Text profile="uwmFormInfoValue" position="-20px -172px" id="infoValue3"/>
+                    <Text profile="uwmFormInfoKey" position="20px -202px" id="infoKey4"/>
+                    <Text profile="uwmFormInfoValue" position="-20px -202px" id="infoValue4"/>
+                    <Text profile="uwmFormInfoKey" position="20px -232px" id="infoKey5"/>
+                    <Text profile="uwmFormInfoValue" position="-20px -232px" id="infoValue5"/>
+                    <Text profile="uwmFormPickupNote" id="pickupNote"/>
+                    <!-- pallet goods: the size of the new pallets (a card with a tile; click switches) -->
+                    <GuiElement profile="uwmFormSizeBox" id="palletSizeBox">
+                        <Bitmap profile="uwmFormSizeEdge" name="uwmImg_solid"/>
+                        <Bitmap profile="uwmFormSizeBg" name="uwmImg_solid"/>
+                        <Bitmap profile="uwmFormSizeTile" name="uwmImg_tile"/>
+                        <Bitmap profile="uwmFormSizeIcon" name="uwmImg_pallet"/>
+                        <Text profile="uwmFormSizeLabel" text="$l10n_uwm_form_palletSizeLabel"/>
+                        <Text profile="uwmFormSizeValue" id="palletSizeValue"/>
+                        <Text profile="uwmFormSizeChoices" text="$l10n_uwm_form_palletSizes"/>
+                        <Button profile="uwmFormHitbox" id="palletSizeButton" onClick="onClickPalletSize"/>
+                    </GuiElement>
+                </GuiElement>
+
+                <!-- the invoice line -->
+                <Bitmap profile="uwmFormLineEdge" name="uwmImg_solid"/>
+                <Bitmap profile="uwmFormLineBg" name="uwmImg_solid"/>
+                <Text profile="uwmFormSectionTitle" position="20px -484px" text="$l10n_uwm_form_lineTitle"/>
+                <Text profile="uwmFormCustomer" id="customerText"/>
+                <Bitmap profile="uwmFormRule" position="0px -510px" name="uwmImg_solid"/>
+                <Text profile="uwmFormHead" position="64px -516px" size="120px 20px" text="$l10n_uwm_form_colGoods"/>
+                <Text profile="uwmFormHead" position="184px -516px" size="120px 20px" text="$l10n_uwm_form_colPickup"/>
+                <Text profile="uwmFormHead" position="304px -516px" size="100px 20px" text="$l10n_uwm_form_colQty"/>
+                <Text profile="uwmFormHead" position="404px -516px" size="56px 20px" text="$l10n_uwm_form_colUnit"/>
+                <Text profile="uwmFormHead" position="460px -516px" size="150px 20px" text="$l10n_uwm_form_colPrice"/>
+                <Text profile="uwmFormHead" position="610px -516px" size="100px 20px" text="$l10n_uwm_form_colDiscount"/>
+                <Text profile="uwmFormHead" position="710px -516px" size="120px 20px" text="$l10n_uwm_form_colRepeat"/>
+                <Text profile="uwmFormHead" position="830px -516px" size="200px 20px" text="$l10n_uwm_form_colAmount"/>
+                <Bitmap profile="uwmFormRowOutline" name="uwmImg_solid"/>
+                <Bitmap profile="uwmFormRowFill" name="uwmImg_solid"/>
+                <Bitmap profile="uwmFormRowTile" name="uwmImg_tile"/>
+                <Bitmap profile="uwmFormRowIcon" id="rowIcon"/>
+                <Text profile="uwmFormCell" position="64px -542px" size="120px 40px" id="rowGood"/>
+                <Text profile="uwmFormCell" position="184px -542px" size="120px 40px" id="rowPickup"/>
+                <Text profile="uwmFormCell" position="304px -542px" size="100px 40px" id="rowQty"/>
+                <Text profile="uwmFormCell" position="404px -542px" size="56px 40px" id="rowUnit"/>
+                <Text profile="uwmFormCell" position="460px -542px" size="150px 40px" id="rowPrice"/>
+                <Text profile="uwmFormCell" position="610px -542px" size="100px 40px" id="rowDiscount"/>
+                <Text profile="uwmFormCell" position="710px -542px" size="120px 40px" id="rowRepeat"/>
+                <Text profile="uwmFormCellBold" position="830px -542px" size="200px 40px" id="rowAmount"/>
+
+                <!-- inputs: price | amount | amount in liters | discount % | repeat -->
+                <Text profile="uwmFormInputLabel" position="0px -604px" id="priceLabel"/>
+                <TextInput profile="uwmFormInput" position="0px -622px" id="priceInput" onTextChanged="onInputChanged" enterWhenClickOutside="false">
+                    <ThreePartBitmap profile="uwmFormInputOutline"/>
+                    <Bitmap profile="uwmFormInputPen" name="uwmImg_pencil"/>
+                </TextInput>
+                <Text profile="uwmFormInputLabel" position="212px -604px" text="$l10n_uwm_form_amount"/>
+                <Button profile="uwmFormToggle" position="212px -622px" id="amountButton" onClick="onClickAmount">
+                    <ThreePartBitmap profile="uwmFormInputOutline"/>
+                    <Bitmap profile="uwmFormInputDrop" name="uwmImg_drop"/>
+                </Button>
+                <Text profile="uwmFormInputLabel" position="424px -604px" id="qtyLabel"/>
+                <TextInput profile="uwmFormInput" position="424px -622px" id="qtyInput" onTextChanged="onInputChanged" enterWhenClickOutside="false">
+                    <ThreePartBitmap profile="uwmFormInputOutline"/>
+                    <Bitmap profile="uwmFormInputPen" name="uwmImg_pencil"/>
+                </TextInput>
+                <Text profile="uwmFormInputLabel" position="636px -604px" text="$l10n_uwm_form_discount"/>
+                <TextInput profile="uwmFormInput" position="636px -622px" id="discountInput" onTextChanged="onInputChanged" enterWhenClickOutside="false">
+                    <ThreePartBitmap profile="uwmFormInputOutline"/>
+                    <Bitmap profile="uwmFormInputPen" name="uwmImg_pencil"/>
+                </TextInput>
+                <Text profile="uwmFormInputLabel" position="848px -604px" text="$l10n_uwm_form_repeat"/>
+                <Button profile="uwmFormToggle" position="848px -622px" id="repeatButton" onClick="onClickRepeat">
+                    <ThreePartBitmap profile="uwmFormInputOutline"/>
+                    <Bitmap profile="uwmFormInputDrop" name="uwmImg_drop"/>
+                </Button>
+                <Text profile="uwmFormHint" id="priceHint"/>
+
+                <!-- total -->
+                <Bitmap profile="uwmFormTotalEdge" name="uwmImg_solid"/>
+                <Bitmap profile="uwmFormTotalBg" name="uwmImg_solid"/>
+                <Text profile="uwmFormTotalLabel" id="totalLabel"/>
+                <Text profile="uwmFormTotalValue" id="totalValue"/>
+                <Text profile="uwmFormTotalPill" id="totalPill"/>
+                <Text profile="uwmFormTotalDetail" id="totalDetail"/>
+                <Text profile="uwmFormTotalDiscount" id="totalDiscount"/>
+            </GuiElement>
+        </GuiElement>
+
+        <BoxLayout profile="fs25_dialogButtonBox" size="1040px 60px">
+            <Button profile="buttonOK" id="sendButton" onClick="onClickSend"/>
+            <Bitmap profile="fs25_dialogButtonBoxSeparator"/>
+            <Button profile="buttonBack" text="$l10n_uwm_button_cancel" onClick="onClickBack"/>
+        </BoxLayout>
+    </GuiElement>
+
+    <GUIProfiles>
+        <Profile name="uwmFormDialogBg" extends="fs25_dialogBg">
+            <size value="1100px 930px"/>
+        </Profile>
+
+        <Profile name="uwmFormContent" extends="emptyPanel" with="anchorTopCenter">
+            <size value="1040px 830px"/>
+        </Profile>
+
+        <!-- plain shapes (a cell of our sheet, tinted) -->
+        <Profile name="uwmShape" extends="baseReference" with="anchorTopLeft">
+            <imageColor value="0.110 0.114 0.106 1"/>
+        </Profile>
+        <Profile name="uwmEdge" extends="uwmShape">
+            <imageColor value="0.180 0.188 0.169 1"/>
+        </Profile>
+
+        <!-- header -->
+        <Profile name="uwmFormHeadTile" extends="uwmShape">
+            <position value="0px -4px"/>
+            <size value="58px 58px"/>
+            <imageColor value="0.525 0.694 0.067 1"/>
+        </Profile>
+        <Profile name="uwmFormHeadIcon" extends="uwmShape">
+            <position value="7px -11px"/>
+            <size value="44px 44px"/>
+            <imageColor value="1 1 1 1"/>
+        </Profile>
+        <Profile name="uwmFormBrand" extends="baseReference" with="anchorTopLeft">
+            <position value="74px -6px"/>
+            <size value="400px 20px"/>
+            <textSize value="14px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textColor value="0.651 0.784 0.235 1"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwmFormTitle" extends="baseReference" with="anchorTopLeft">
+            <position value="74px -26px"/>
+            <size value="600px 34px"/>
+            <textSize value="26px"/>
+            <textBold value="true"/>
+            <textColor value="$preset_colorWhite"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwmFormIssuerEdge" extends="uwmEdge">
+            <position value="840px -4px"/>
+            <size value="200px 54px"/>
+        </Profile>
+        <Profile name="uwmFormIssuerBg" extends="uwmShape">
+            <position value="841px -5px"/>
+            <size value="198px 52px"/>
+        </Profile>
+        <Profile name="uwmFormIssuerLabel" extends="baseReference" with="anchorTopLeft">
+            <position value="856px -10px"/>
+            <size value="170px 16px"/>
+            <textSize value="11px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textColor value="0.431 0.439 0.412 1"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwmFormIssuerName" extends="baseReference" with="anchorTopLeft">
+            <position value="856px -28px"/>
+            <size value="170px 24px"/>
+            <textSize value="18px"/>
+            <textBold value="true"/>
+            <textColor value="$preset_colorWhite"/>
+            <textAlignment value="right"/>
+            <textVerticalAlignment value="middle"/>
+            <textLayoutMode value="scrolling"/>
+        </Profile>
+        <Profile name="uwmFormRule" extends="uwmShape">
+            <size value="1040px 1dp"/>
+            <imageColor value="0.243 0.251 0.227 1"/>
+        </Profile>
+
+        <!-- columns -->
+        <Profile name="uwmFormColumn" extends="emptyPanel" with="anchorTopLeft">
+            <size value="336px 380px"/>
+        </Profile>
+        <Profile name="uwmFormCardEdge" extends="uwmEdge">
+            <size value="336px 380px"/>
+        </Profile>
+        <Profile name="uwmFormCardBg" extends="uwmShape">
+            <position value="1px -1px"/>
+            <size value="334px 378px"/>
+        </Profile>
+        <Profile name="uwmFormCardTitle" extends="baseReference" with="anchorTopLeft">
+            <position value="18px -12px"/>
+            <size value="300px 24px"/>
+            <textSize value="13px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textColor value="0.431 0.439 0.412 1"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwmFormCardRule" extends="uwmShape">
+            <position value="1px -44px"/>
+            <size value="334px 1dp"/>
+            <imageColor value="0.243 0.251 0.227 1"/>
+        </Profile>
+        <Profile name="uwmFormColumnList" extends="emptyPanel" with="anchorTopLeft">
+            <position value="8px -52px"/>
+            <size value="320px 320px"/>
+        </Profile>
+        <Profile name="uwmFormColumnNote" extends="baseReference" with="anchorTopLeft">
+            <position value="20px -64px"/>
+            <size value="296px 120px"/>
+            <textSize value="15px"/>
+            <textColor value="$preset_colorWhite_50"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="top"/>
+            <textWrapWidth value="296px"/>
+        </Profile>
+
+        <!-- a pick row: selected = green outline + soft fill + solid green tile with a dark icon -->
+        <Profile name="uwmFormPickItem" extends="baseReference" with="anchorTopStretchingX">
+            <height value="48px"/>
+            <imageColor value="0 0 0 0"/>
+            <imageSelectedColor value="0 0 0 0"/>
+            <imageFocusedColor value="0 0 0 0"/>
+            <imageHighlightedColor value="0 0 0 0"/>
+        </Profile>
+        <Profile name="uwmFormSelOutline" extends="baseReference" with="anchorTopLeft">
+            <position value="0px -2px"/>
+            <size value="320px 44px"/>
+            <imageColor value="0 0 0 0"/>
+            <imageSelectedColor value="0.651 0.784 0.235 1"/>
+            <imageHighlightedColor value="0.651 0.784 0.235 0.35"/>
+        </Profile>
+        <Profile name="uwmFormSelFill" extends="baseReference" with="anchorTopLeft">
+            <position value="2px -4px"/>
+            <size value="316px 40px"/>
+            <imageColor value="0 0 0 0"/>
+            <imageSelectedColor value="0.196 0.235 0.110 1"/>
+            <imageHighlightedColor value="0.196 0.235 0.110 0.6"/>
+        </Profile>
+        <Profile name="uwmFormPickTile" extends="baseReference" with="anchorTopLeft">
+            <position value="8px -8px"/>
+            <size value="32px 32px"/>
+            <imageColor value="0.157 0.173 0.133 1"/>
+            <imageSelectedColor value="0.525 0.694 0.067 1"/>
+        </Profile>
+        <Profile name="uwmFormPickIcon" extends="baseReference" with="anchorTopLeft">
+            <position value="11px -11px"/>
+            <size value="26px 26px"/>
+            <imageColor value="0.651 0.784 0.235 1"/>
+            <imageSelectedColor value="0.110 0.133 0.047 1"/>
+        </Profile>
+        <Profile name="uwmFormPickName" extends="baseReference" with="anchorTopLeft">
+            <position value="50px 0px"/>
+            <size value="150px 48px"/>
+            <textSize value="16px"/>
+            <textColor value="0.843 0.843 0.824 1"/>
+            <textSelectedColor value="$preset_colorWhite"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+            <textLayoutMode value="scrolling"/>
+        </Profile>
+        <Profile name="uwmFormPickPrice" extends="baseReference" with="anchorTopRight">
+            <position value="-30px 0px"/>
+            <size value="120px 48px"/>
+            <textSize value="13px"/>
+            <textBold value="true"/>
+            <textColor value="0.651 0.784 0.235 1"/>
+            <textSelectedColor value="0.651 0.784 0.235 1"/>
+            <textAlignment value="right"/>
+            <textVerticalAlignment value="middle"/>
+            <textLayoutMode value="scrolling"/>
+        </Profile>
+        <Profile name="uwmFormPickArrow" extends="baseReference" with="anchorTopRight">
+            <position value="-6px -14px"/>
+            <size value="20px 20px"/>
+            <imageColor value="0.431 0.439 0.412 1"/>
+            <imageSelectedColor value="0.651 0.784 0.235 1"/>
+        </Profile>
+
+        <!-- pickup column -->
+        <Profile name="uwmFormDepotOutline" extends="uwmShape">
+            <position value="8px -54px"/>
+            <size value="320px 44px"/>
+            <imageColor value="0.651 0.784 0.235 1"/>
+        </Profile>
+        <Profile name="uwmFormDepotFill" extends="uwmShape">
+            <position value="10px -56px"/>
+            <size value="316px 40px"/>
+            <imageColor value="0.196 0.235 0.110 1"/>
+        </Profile>
+        <Profile name="uwmFormDepotTile" extends="uwmShape">
+            <position value="16px -60px"/>
+            <size value="32px 32px"/>
+            <imageColor value="0.525 0.694 0.067 1"/>
+        </Profile>
+        <Profile name="uwmFormDepotIcon" extends="uwmShape">
+            <position value="19px -63px"/>
+            <size value="26px 26px"/>
+            <imageColor value="0.110 0.133 0.047 1"/>
+        </Profile>
+        <Profile name="uwmFormDepotName" extends="baseReference" with="anchorTopLeft">
+            <position value="58px -54px"/>
+            <size value="190px 44px"/>
+            <textSize value="16px"/>
+            <textBold value="true"/>
+            <textColor value="$preset_colorWhite"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+            <textLayoutMode value="scrolling"/>
+        </Profile>
+        <Profile name="uwmFormDepotFixed" extends="baseReference" with="anchorTopLeft">
+            <position value="250px -54px"/>
+            <size value="66px 44px"/>
+            <textSize value="12px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textColor value="0.651 0.784 0.235 1"/>
+            <textAlignment value="right"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwmFormInfoKey" extends="baseReference" with="anchorTopLeft">
+            <size value="170px 26px"/>
+            <textSize value="14px"/>
+            <textColor value="0.667 0.667 0.647 1"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwmFormInfoValue" extends="baseReference" with="anchorTopRight">
+            <size value="130px 26px"/>
+            <textSize value="14px"/>
+            <textBold value="true"/>
+            <textColor value="$preset_colorWhite"/>
+            <textAlignment value="right"/>
+            <textVerticalAlignment value="middle"/>
+            <textLayoutMode value="scrolling"/>
+        </Profile>
+        <Profile name="uwmFormPickupNote" extends="baseReference" with="anchorTopLeft">
+            <position value="16px -264px"/>
+            <size value="304px 36px"/>
+            <textSize value="12px"/>
+            <textColor value="0.431 0.439 0.412 1"/>
+            <textAlignment value="center"/>
+            <textVerticalAlignment value="top"/>
+            <textWrapWidth value="304px"/>
+        </Profile>
+        <Profile name="uwmFormSizeBox" extends="emptyPanel" with="anchorTopLeft">
+            <position value="20px -302px"/>
+            <size value="296px 56px"/>
+        </Profile>
+        <Profile name="uwmFormSizeEdge" extends="uwmShape">
+            <size value="296px 56px"/>
+            <imageColor value="0.651 0.784 0.235 1"/>
+        </Profile>
+        <Profile name="uwmFormSizeBg" extends="uwmShape">
+            <position value="2px -2px"/>
+            <size value="292px 52px"/>
+            <imageColor value="0.094 0.098 0.090 1"/>
+        </Profile>
+        <Profile name="uwmFormSizeTile" extends="uwmShape">
+            <position value="10px -10px"/>
+            <size value="36px 36px"/>
+            <imageColor value="0.157 0.173 0.133 1"/>
+        </Profile>
+        <Profile name="uwmFormSizeIcon" extends="uwmShape">
+            <position value="13px -13px"/>
+            <size value="30px 30px"/>
+            <imageColor value="0.651 0.784 0.235 1"/>
+        </Profile>
+        <Profile name="uwmFormSizeLabel" extends="baseReference" with="anchorTopLeft">
+            <position value="56px -8px"/>
+            <size value="150px 16px"/>
+            <textSize value="11px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textColor value="0.431 0.439 0.412 1"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwmFormSizeValue" extends="baseReference" with="anchorTopLeft">
+            <position value="56px -24px"/>
+            <size value="130px 26px"/>
+            <textSize value="17px"/>
+            <textBold value="true"/>
+            <textColor value="$preset_colorWhite"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwmFormSizeChoices" extends="baseReference" with="anchorTopRight">
+            <position value="-12px -18px"/>
+            <size value="110px 20px"/>
+            <textSize value="12px"/>
+            <textColor value="0.431 0.439 0.412 1"/>
+            <textAlignment value="right"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <!-- invisible button over a card -->
+        <Profile name="uwmFormHitbox" extends="baseReference" with="anchorTopLeft">
+            <size value="296px 56px"/>
+            <handleFocus value="true"/>
+            <hideKeyboardGlyph value="true"/>
+            <imageColor value="0 0 0 0"/>
+            <imageFocusedColor value="0 0 0 0"/>
+            <imageHighlightedColor value="0 0 0 0"/>
+            <imageSelectedColor value="0 0 0 0"/>
+            <imageDisabledColor value="0 0 0 0"/>
+            <textColor value="0 0 0 0"/>
+            <textFocusedColor value="0 0 0 0"/>
+            <textHighlightedColor value="0 0 0 0"/>
+            <textSelectedColor value="0 0 0 0"/>
+        </Profile>
+
+        <!-- the invoice line -->
+        <Profile name="uwmFormLineEdge" extends="uwmEdge">
+            <position value="0px -478px"/>
+            <size value="1040px 112px"/>
+        </Profile>
+        <Profile name="uwmFormLineBg" extends="uwmShape">
+            <position value="1px -479px"/>
+            <size value="1038px 110px"/>
+        </Profile>
+        <Profile name="uwmFormSectionTitle" extends="baseReference" with="anchorTopLeft">
+            <size value="400px 24px"/>
+            <textSize value="13px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textColor value="0.431 0.439 0.412 1"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwmFormCustomer" extends="baseReference" with="anchorTopLeft">
+            <position value="520px -484px"/>
+            <size value="500px 24px"/>
+            <textSize value="15px"/>
+            <textBold value="true"/>
+            <textColor value="0.651 0.784 0.235 1"/>
+            <textAlignment value="right"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwmFormHead" extends="baseReference" with="anchorTopLeft">
+            <textSize value="11px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textColor value="0.431 0.439 0.412 1"/>
+            <textAlignment value="center"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwmFormRowOutline" extends="uwmShape">
+            <position value="8px -540px"/>
+            <size value="1024px 44px"/>
+            <imageColor value="0.651 0.784 0.235 1"/>
+        </Profile>
+        <Profile name="uwmFormRowFill" extends="uwmShape">
+            <position value="10px -542px"/>
+            <size value="1020px 40px"/>
+            <imageColor value="0.196 0.235 0.110 1"/>
+        </Profile>
+        <Profile name="uwmFormRowTile" extends="uwmShape">
+            <position value="16px -546px"/>
+            <size value="32px 32px"/>
+            <imageColor value="0.525 0.694 0.067 1"/>
+        </Profile>
+        <Profile name="uwmFormRowIcon" extends="uwmShape">
+            <position value="19px -549px"/>
+            <size value="26px 26px"/>
+            <imageColor value="0.110 0.133 0.047 1"/>
+        </Profile>
+        <Profile name="uwmFormCell" extends="baseReference" with="anchorTopLeft">
+            <textSize value="14px"/>
+            <textColor value="$preset_colorWhite"/>
+            <textAlignment value="center"/>
+            <textVerticalAlignment value="middle"/>
+            <textLayoutMode value="scrolling"/>
+        </Profile>
+        <Profile name="uwmFormCellBold" extends="uwmFormCell">
+            <textBold value="true"/>
+        </Profile>
+
+        <!-- inputs -->
+        <Profile name="uwmFormInputLabel" extends="baseReference" with="anchorTopLeft">
+            <size value="192px 16px"/>
+            <textSize value="11px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textColor value="0.431 0.439 0.412 1"/>
+            <textAlignment value="center"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwmFormInput" extends="fs25_textInput" with="anchorTopLeft">
+            <size value="192px 32px"/>
+            <handleFocus value="true"/>
+            <applyProfanityFilter value="false"/>
+            <maxCharacters value="11"/>
+            <imageSliceId value="noSlice"/>
+            <imageColor value="$preset_colorTransparent"/>
+            <imageFocusedColor value="$preset_colorTransparent"/>
+            <imageHighlightedColor value="$preset_colorTransparent"/>
+            <imageSelectedColor value="$preset_colorTransparent"/>
+            <imageDisabledColor value="$preset_colorTransparent"/>
+            <textDisabledColor value="$preset_fs25_colorGreyDark"/>
+            <textAlignment value="center"/>
+            <textOffset value="0px 2px"/>
+            <cursorSize value="1px 14px"/>
+            <cursorOffset value="1px -2px"/>
+        </Profile>
+        <Profile name="uwmFormInputOutline" extends="baseReference">
+            <imageSliceId value="gui.3dShop_button_outline_middle"/>
+            <imageColor value="0.290 0.298 0.275 1"/>
+            <imageFocusedColor value="$preset_fs25_colorMainHighlight"/>
+            <imageHighlightedColor value="$preset_fs25_colorMainHighlight"/>
+            <imageDisabledColor value="$preset_fs25_colorGreyDark"/>
+            <startImageSize value="6px 0"/>
+            <startImageSliceId value="gui.3dShop_button_outline_left"/>
+            <startImageColor value="0.290 0.298 0.275 1"/>
+            <startImageFocusedColor value="$preset_fs25_colorMainHighlight"/>
+            <startImageHighlightedColor value="$preset_fs25_colorMainHighlight"/>
+            <startImageDisabledColor value="$preset_fs25_colorGreyDark"/>
+            <endImageSize value="6px 0"/>
+            <endImageSliceId value="gui.3dShop_button_outline_right"/>
+            <endImageColor value="0.290 0.298 0.275 1"/>
+            <endImageFocusedColor value="$preset_fs25_colorMainHighlight"/>
+            <endImageHighlightedColor value="$preset_fs25_colorMainHighlight"/>
+            <endImageDisabledColor value="$preset_fs25_colorGreyDark"/>
+        </Profile>
+        <Profile name="uwmFormInputPen" extends="baseReference" with="anchorMiddleRight">
+            <position value="-8px 0px"/>
+            <size value="16px 16px"/>
+            <imageColor value="0.667 0.667 0.647 1"/>
+            <imageFocusedColor value="$preset_fs25_colorMainHighlight"/>
+            <imageHighlightedColor value="$preset_fs25_colorMainHighlight"/>
+        </Profile>
+        <Profile name="uwmFormInputDrop" extends="uwmFormInputPen">
+            <imageColor value="0.651 0.784 0.235 1"/>
+        </Profile>
+        <!-- click to step through the choices (amount: set / all in stock; repeat: once / daily / weekly) -->
+        <Profile name="uwmFormToggle" extends="baseReference" with="anchorTopLeft">
+            <size value="192px 32px"/>
+            <handleFocus value="true"/>
+            <hideKeyboardGlyph value="true"/>
+            <imageColor value="0 0 0 0"/>
+            <imageFocusedColor value="0 0 0 0"/>
+            <imageHighlightedColor value="0 0 0 0"/>
+            <imageSelectedColor value="0 0 0 0"/>
+            <imageDisabledColor value="0 0 0 0"/>
+            <textSize value="15px"/>
+            <textColor value="$preset_colorWhite"/>
+            <textFocusedColor value="$preset_fs25_colorMainHighlight"/>
+            <textHighlightedColor value="$preset_fs25_colorMainHighlight"/>
+            <textSelectedColor value="$preset_colorWhite"/>
+            <textDisabledColor value="$preset_fs25_colorGreyDark"/>
+            <textAlignment value="center"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwmFormHint" extends="baseReference" with="anchorTopLeft">
+            <position value="0px -660px"/>
+            <size value="1040px 18px"/>
+            <textSize value="12px"/>
+            <textColor value="0.431 0.439 0.412 1"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+
+        <!-- total -->
+        <Profile name="uwmFormTotalEdge" extends="uwmEdge">
+            <position value="0px -688px"/>
+            <size value="1040px 132px"/>
+        </Profile>
+        <Profile name="uwmFormTotalBg" extends="uwmShape">
+            <position value="1px -689px"/>
+            <size value="1038px 130px"/>
+            <imageColor value="0.086 0.090 0.082 1"/>
+        </Profile>
+        <Profile name="uwmFormTotalLabel" extends="baseReference" with="anchorTopLeft">
+            <position value="24px -704px"/>
+            <size value="400px 22px"/>
+            <textSize value="13px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textColor value="0.431 0.439 0.412 1"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwmFormTotalValue" extends="baseReference" with="anchorTopLeft">
+            <position value="24px -732px"/>
+            <size value="300px 60px"/>
+            <textSize value="38px"/>
+            <textBold value="true"/>
+            <textColor value="0.651 0.784 0.235 1"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwmFormTotalPill" extends="baseReference" with="anchorTopLeft">
+            <position value="330px -748px"/>
+            <size value="200px 28px"/>
+            <textSize value="13px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textColor value="0.651 0.784 0.235 1"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwmFormTotalDetail" extends="baseReference" with="anchorTopLeft">
+            <position value="540px -716px"/>
+            <size value="476px 22px"/>
+            <textSize value="15px"/>
+            <textColor value="$preset_colorWhite"/>
+            <textAlignment value="right"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+        <Profile name="uwmFormTotalDiscount" extends="uwmFormTotalDetail">
+            <position value="540px -760px"/>
+            <textColor value="0.651 0.784 0.235 1"/>
+        </Profile>
+    </GUIProfiles>
+</GUI>

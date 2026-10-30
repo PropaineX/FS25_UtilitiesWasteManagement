@@ -8,11 +8,16 @@ function Class(members, baseClass)
 end
 Event = {new = function(mt) return setmetatable({}, mt) end}
 function InitEventClass() end
-FillType = {UNKNOWN = 0, ELECTRICCHARGE = 1, LIQUIDMANURE = 2, MANURE = 3}
-local FT_NAMES = {"ELECTRICCHARGE", "LIQUIDMANURE", "MANURE"}
+FillType = {UNKNOWN = 0, ELECTRICCHARGE = 1, LIQUIDMANURE = 2, MANURE = 3, WHEAT = 4, GOATMILK = 5, BARLEY = 6, HONEY = 7}
+local FT_NAMES = {"ELECTRICCHARGE", "LIQUIDMANURE", "MANURE", "WHEAT", "GOATMILK", "BARLEY", "HONEY"}
+local PALLET_FILES = {WHEAT = "wheatBag.xml", HONEY = "honeyPallet.xml"}
+local BULK = {MANURE = true, WHEAT = true, BARLEY = true}
 g_fillTypeManager = {
     getFillTypeIndexByName = function(_, n) for i, v in ipairs(FT_NAMES) do if v == n then return i end end return nil end,
-    getFillTypeByIndex = function(_, i) if FT_NAMES[i] then return {name = FT_NAMES[i], title = FT_NAMES[i], pricePerLiter = 0.02} end end
+    getFillTypeNameByIndex = function(_, i) return FT_NAMES[i] end,
+    getIsFillTypeInCategory = function(_, i, cat) return cat == "BULK" and BULK[FT_NAMES[i] or ""] == true end,
+    getFillTypes = function() local t = {} for i, n in ipairs(FT_NAMES) do t[i] = {index = i, name = n} end return t end,
+    getFillTypeByIndex = function(_, i) if FT_NAMES[i] then return {name = FT_NAMES[i], title = FT_NAMES[i], pricePerLiter = 0.02, palletFilename = PALLET_FILES[FT_NAMES[i]]} end end
 }
 FarmManager = {SPECTATOR_FARM_ID = 0}
 MoneyType = {SOLD_PRODUCTS = 1, BOUGHT_MATERIALS = 2, register = function(n) return n end}
@@ -161,4 +166,47 @@ function XMLFile:iterate(base, fn)
         fn(i + 1, key)
         i = i + 1
     end
+end
+
+-- game dialogs for the form tests: each one records what it was asked, the test answers by calling .last.cb
+MessageDialog = {new = function(_, mt) return setmetatable({}, mt) end}
+dialogLog = {}
+local function logDialog(kind) return function(...) table.insert(dialogLog, {kind = kind, args = {...}}) end end
+InfoDialog = {show = logDialog("info")}
+YesNoDialog = {show = logDialog("yesno")}
+OptionDialog = {show = logDialog("option")}
+TextInputDialog = {show = logDialog("text")}
+
+-- pallets on the map (vehicles) and the depot's pallet spawner
+ToolType = ToolType or {}
+ToolType.UNDEFINED = ToolType.UNDEFINED or 0
+PalletSpawner = {RESULT_SUCCESS = 1, RESULT_NO_SPACE = 2, PALLET_LIMITED_REACHED = 3, NO_PALLET_FOR_FILLTYPE = 4, RESULT_ERROR_LOADING_PALLET = 5}
+function newPallet(farmId, fillTypeIndex, liters, capacity)
+    local v = {isPallet = true, farmId = farmId, ft = fillTypeIndex, level = liters, capacity = capacity or 1000, spec_pallet = {fillUnitIndex = 1}}
+    v.getOwnerFarmId = function(self) return self.farmId end
+    v.getFillUnitFillType = function(self) return self.level > 0 and self.ft or FillType.UNKNOWN end
+    v.getFillUnitFillLevel = function(self) return self.level end
+    v.addFillUnitFillLevel = function(self, _, _, delta, ft)
+        if delta > 0 and self.level > 0 and ft ~= self.ft then return 0 end
+        local new = math.max(math.min(self.level + delta, self.capacity), 0)
+        local d = new - self.level
+        self.level = new
+        if delta > 0 then self.ft = ft end
+        return d
+    end
+    v.emptyAllFillUnits = function(self) self.level = 0 end
+    v.delete = function(self) self.isDeleted = true
+        for i, other in ipairs(g_currentMission.vehicleSystem.vehicles) do if other == self then table.remove(g_currentMission.vehicleSystem.vehicles, i) break end end
+    end
+    table.insert(g_currentMission.vehicleSystem.vehicles, v)
+    return v
+end
+g_currentMission.vehicleSystem = {vehicles = {}}
+g_time = 0
+fakeSpawner = {spawned = {}, capacity = 1000, full = false, fillTypeIdToPallet = {}}
+function fakeSpawner:spawnPallet(farmId, ft, cb, target)
+    if self.full then cb(target, nil, PalletSpawner.RESULT_NO_SPACE, ft) return end
+    local p = newPallet(farmId, ft, 0, self.capacity)
+    table.insert(self.spawned, p)
+    cb(target, p, PalletSpawner.RESULT_SUCCESS, ft)
 end

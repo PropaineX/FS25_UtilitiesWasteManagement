@@ -202,12 +202,66 @@ function UWMStock.getSourceStorages(farmId, fillTypeIndex)
         if fillTypeIndex == FillType.ELECTRICCHARGE then
             usable = entry.kind == UWMStock.KIND_PRODUCTION
                 and UWMStock.getProductionMakesOutput(entry.placeable.spec_productionPoint.productionPoint, fillTypeIndex)
+        elseif UtilitiesWasteManagement.getIsBulk(fillTypeIndex) then
+            -- bulk: only what can be taken out to sell - silos, and what productions made (not their inputs,
+            -- not animal pens: user, 2026-10-28 "I don't need to see my goat milk in my dairy")
+            usable = UWMStock.getIsSellableSource(entry, fillTypeIndex)
         end
         if usable and getFillLevel(entry.storage, fillTypeIndex) > 0 then
             table.insert(sources, entry)
         end
     end
     return sources
+end
+
+function UWMStock.getIsSellableSource(entry, fillTypeIndex)
+    if entry.kind == UWMStock.KIND_SILO then
+        return true
+    elseif entry.kind == UWMStock.KIND_PRODUCTION then
+        return UWMStock.getProductionMakesOutput(entry.placeable.spec_productionPoint.productionPoint, fillTypeIndex)
+    end
+    return false
+end
+
+-- the farm's bulk goods it can sell now: {fillTypeIndex, name, liters} with liters = free stock, A - Z
+function UWMStock.getBulkGoods(farmId)
+    local found = {}
+    for _, entry in ipairs(UWMStock.getStorages(farmId)) do
+        local levels = entry.storage.fillLevels
+        if levels ~= nil then
+            for fillTypeIndex in pairs(levels) do
+                if not found[fillTypeIndex] and UtilitiesWasteManagement.getIsBulk(fillTypeIndex)
+                    and UWMStock.getIsSellableSource(entry, fillTypeIndex) then
+                    found[fillTypeIndex] = true
+                end
+            end
+        end
+    end
+    local goods = {}
+    for fillTypeIndex in pairs(found) do
+        local liters = UWMStock.getAvailable(farmId, fillTypeIndex, nil)
+        if liters >= 1 then
+            table.insert(goods, {fillTypeIndex = fillTypeIndex, name = UtilitiesWasteManagement.getGoodName(fillTypeIndex), liters = liters})
+        end
+    end
+    table.sort(goods, function(a, b)
+        return a.name:lower() < b.name:lower()
+    end)
+    return goods
+end
+
+-- every bulk good in the game, A - Z (a standing buy order has no seller to check yet)
+function UWMStock.getAllBulkGoods()
+    local goods = {}
+    for _, fillType in ipairs(g_fillTypeManager:getFillTypes()) do
+        if UtilitiesWasteManagement.getIsBulk(fillType.index) then
+            table.insert(goods, {fillTypeIndex = fillType.index, name = UtilitiesWasteManagement.getGoodName(fillType.index)})
+        end
+    end
+    table.sort(goods, function(a, b)
+        return a.name:lower() < b.name:lower()
+    end)
+    return goods
 end
 
 function UWMStock.getStock(farmId, fillTypeIndex)
@@ -239,13 +293,14 @@ function UWMStock.take(farmId, fillTypeIndex, liters)
         local fillLevel = getFillLevel(entry.storage, fillTypeIndex)
         local amount = math.min(fillLevel, liters - taken)
         entry.storage:setFillLevel(fillLevel - amount, fillTypeIndex)
-        taken = taken + (fillLevel - getFillLevel(entry.storage, fillTypeIndex))
+        -- never count more than was asked (a storage over its capacity clamps lower when set)
+        taken = taken + math.min(fillLevel - getFillLevel(entry.storage, fillTypeIndex), amount)
     end
     UWMStock.isMovingGoods = false
     return taken
 end
 
--- puts liters back into the farm's storages that hold this fill type (after a draw the vehicle couldn't take)
+-- puts liters back into the farm's storages that hold this fill type; returns what didn't fit
 function UWMStock.giveBack(farmId, fillTypeIndex, liters)
     local left = liters
     UWMStock.isMovingGoods = true
@@ -261,9 +316,7 @@ function UWMStock.giveBack(farmId, fillTypeIndex, liters)
         end
     end
     UWMStock.isMovingGoods = false
-    if left > 0.01 then
-        Logging.warning("%s %.1f l could not be put back into farm %d's storages", UtilitiesWasteManagement.TAG, left, farmId)
-    end
+    return math.max(left, 0)
 end
 
 -- the buyer's production points that can take electricity: {placeable, storage, name}

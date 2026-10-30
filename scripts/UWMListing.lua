@@ -28,6 +28,9 @@ function UWMListing.new()
     self.fillTypeIndex = FillType.UNKNOWN
     self.liters = 0             -- the whole order
     self.remaining = 0          -- still open for other farms
+    self.depotLiters = 0        -- OFFER manure / slurry: the poster's goods moved into the depot for it
+    self.isPallet = false       -- pallet goods (deals hand them out as pallets on the depot's pad)
+    self.palletSize = 1000
     self.pricePer1000 = 0
     self.targets = {}           -- WANTED electricity: uniqueIds of the poster's productions, in fill order
 
@@ -57,9 +60,9 @@ function UWMListing:getPrice(liters)
     return liters * self.pricePer1000 / 1000
 end
 
--- an open offer holds the poster's stock for what's left
+-- an open electricity offer holds the poster's stock for what's left (manure / slurry sits in the depot instead)
 function UWMListing:getReservedLiters()
-    if self:getIsOffer() and self:getIsOpen() then
+    if self:getIsOffer() and self:getIsOpen() and self:getIsElectricity() then
         return self.remaining
     end
     return 0
@@ -80,6 +83,9 @@ function UWMListing:writeStream(streamId)
     streamWriteUInt16(streamId, self.fillTypeIndex)
     streamWriteFloat32(streamId, self.liters)
     streamWriteFloat32(streamId, self.remaining)
+    streamWriteFloat32(streamId, self.depotLiters)
+    streamWriteBool(streamId, self.isPallet)
+    streamWriteInt32(streamId, self.palletSize)
     streamWriteFloat32(streamId, self.pricePer1000)
     UWMInvoice.writeTargets(streamId, self.targets)
     streamWriteUInt8(streamId, self.state)
@@ -97,6 +103,9 @@ function UWMListing:readStream(streamId)
     self.fillTypeIndex = streamReadUInt16(streamId)
     self.liters = streamReadFloat32(streamId)
     self.remaining = streamReadFloat32(streamId)
+    self.depotLiters = streamReadFloat32(streamId)
+    self.isPallet = streamReadBool(streamId)
+    self.palletSize = streamReadInt32(streamId)
     self.pricePer1000 = streamReadFloat32(streamId)
     self.targets = UWMInvoice.readTargets(streamId)
     self.state = streamReadUInt8(streamId)
@@ -116,6 +125,9 @@ function UWMListing:saveToXMLFile(xmlFile, key)
     xmlFile:setString(key .. "#fillType", fillType ~= nil and fillType.name or "UNKNOWN")
     xmlFile:setFloat(key .. "#liters", self.liters)
     xmlFile:setFloat(key .. "#remaining", self.remaining)
+    xmlFile:setFloat(key .. "#depotLiters", self.depotLiters)
+    xmlFile:setBool(key .. "#isPallet", self.isPallet)
+    xmlFile:setInt(key .. "#palletSize", self.palletSize)
     xmlFile:setFloat(key .. "#pricePer1000", self.pricePer1000)
     xmlFile:setInt(key .. "#state", self.state)
     xmlFile:setInt(key .. "#createdDay", self.createdDay)
@@ -141,6 +153,9 @@ function UWMListing:loadFromXMLFile(xmlFile, key)
     self.kind = xmlFile:getInt(key .. "#kind", UWMListing.KIND.OFFER)
     self.liters = xmlFile:getFloat(key .. "#liters", 0)
     self.remaining = xmlFile:getFloat(key .. "#remaining", 0)
+    self.depotLiters = xmlFile:getFloat(key .. "#depotLiters", 0)
+    self.isPallet = xmlFile:getBool(key .. "#isPallet", false)
+    self.palletSize = xmlFile:getInt(key .. "#palletSize", 1000)
     self.pricePer1000 = xmlFile:getFloat(key .. "#pricePer1000", 0)
     self.state = xmlFile:getInt(key .. "#state", UWMListing.STATE.OPEN)
     self.createdDay = xmlFile:getInt(key .. "#createdDay", 0)

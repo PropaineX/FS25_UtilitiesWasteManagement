@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no" ?>
 <modDesc descVersion="113">
     <author>PropaineX</author>
-    <version>0.6.0.0</version>
+    <version>0.9.1.0</version>
     <title>
         <en>Utilities &amp; Waste Management Pro Edition</en>
     </title>
@@ -39,10 +39,14 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <sourceFile filename="scripts/UWMInvoice.lua" />
         <sourceFile filename="scripts/UWMListing.lua" />
         <sourceFile filename="scripts/UWMStock.lua" />
+        <sourceFile filename="scripts/UWMPallets.lua" />
         <sourceFile filename="scripts/UWMManager.lua" />
         <sourceFile filename="scripts/UWMEvents.lua" />
         <sourceFile filename="scripts/UWMPickup.lua" />
+        <sourceFile filename="scripts/gui/UWMGui.lua" />
         <sourceFile filename="scripts/gui/UWMWizard.lua" />
+        <sourceFile filename="scripts/gui/UWMOrderDialog.lua" />
+        <sourceFile filename="scripts/gui/UWMCoopDialog.lua" />
         <sourceFile filename="scripts/gui/UWMFrame.lua" />
         <sourceFile filename="scripts/UtilitiesWasteManagement.lua" />
     </extraSourceFiles>
@@ -55,9 +59,8 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_column_farm"><en>Farm</en></text>
         <text name="uwm_column_amount"><en>Amount</en></text>
         <text name="uwm_column_price"><en>Price</en></text>
-        <text name="uwm_column_repeat"><en>Repeats</en></text>
         <text name="uwm_column_status"><en>Status</en></text>
-        <text name="uwm_button_new"><en>New invoice</en></text>
+        <text name="uwm_button_new"><en>New</en></text>
         <text name="uwm_button_accept"><en>Accept</en></text>
         <text name="uwm_button_decline"><en>Decline</en></text>
         <text name="uwm_button_withdraw"><en>Withdraw</en></text>
@@ -105,7 +108,7 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <!-- depot status (page header) and the Depot button -->
         <text name="uwm_depot_title"><en>Community Depot</en></text>
         <text name="uwm_depot_none"><en>No depot on the map: invoices need one (shop: Production, Selling points)</en></text>
-        <text name="uwm_depot_owner"><en>Your farm owns the depot: your share of the upkeep is %s a day</en></text>
+        <text name="uwm_depot_owner"><en>Community depot (you placed it): your share of the upkeep is %s a day</en></text>
         <text name="uwm_depot_waiting"><en>Depot: your membership offer is on its way</en></text>
         <text name="uwm_depot_offered"><en>Depot membership offered (%s a day): press Depot to answer</en></text>
         <text name="uwm_depot_declined"><en>Not a depot member: no invoices. Press Depot to ask to join</en></text>
@@ -287,7 +290,6 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_column_number"><en>Invoice #</en></text>
         <text name="uwm_column_order"><en>Order #</en></text>
         <text name="uwm_column_day"><en>Day</en></text>
-        <text name="uwm_column_description"><en>Description</en></text>
         <text name="uwm_column_type"><en>Type</en></text>
         <text name="uwm_column_product"><en>Product</en></text>
         <text name="uwm_column_left"><en>Left</en></text>
@@ -318,7 +320,6 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_empty_openDeals"><en>No open deals.</en></text>
         <text name="uwm_empty_myOrders"><en>You have not posted any standing orders.</en></text>
         <text name="uwm_empty_myDeals"><en>No deals on standing orders yet.</en></text>
-        <text name="uwm_button_newListing"><en>New standing order</en></text>
         <text name="uwm_button_acceptPay"><en>Accept and pay</en></text>
         <text name="uwm_button_buy"><en>Buy</en></text>
         <text name="uwm_button_sellTo"><en>Sell to them</en></text>
@@ -358,5 +359,126 @@ Multiplayer: everything runs on the server and only farm managers can trade.]]><
         <text name="uwm_details_listingStockHeld"><en>Stock held for it: %s</en></text>
         <text name="uwm_details_listingMoneyHeld"><en>Money held for the rest: %s</en></text>
         <text name="uwm_details_postedDay"><en>Posted on day %d</en></text>
+
+        <!-- UWM CO-OP dialog and form -->
+        <text name="uwm_button_cancel"><en>Cancel</en></text>
+        <text name="uwm_coop_title"><en>UWM Co-op</en></text>
+        <text name="uwm_coop_question"><en>What's on the books today?</en></text>
+        <text name="uwm_coop_bill"><en>Invoice a farm</en></text>
+        <text name="uwm_coop_billHint"><en>Bill a farm for what you sell: slurry, manure, electricity, bulk goods or pallets. Your goods go to the depot and wait there until the farm pays and picks them up.</en></text>
+        <text name="uwm_coop_request"><en>Request an invoice</en></text>
+        <text name="uwm_coop_requestHint"><en>Ask a farm to sell you something. They approve it, you pay, and you collect it at the depot (electricity goes straight to your productions).</en></text>
+        <text name="uwm_coop_wanted"><en>Create a standing buy order</en></text>
+        <text name="uwm_coop_wantedHint"><en>Post what you want and your price on the market. Your money is held for it, and any co-op farm can fill part or all of the order.</en></text>
+        <text name="uwm_coop_offer"><en>Create a standing sell order</en></text>
+        <text name="uwm_coop_offerHint"><en>Put goods up for sale at your price. They move to the depot, and any co-op farm can buy part or all of them.</en></text>
+        <text name="uwm_form_titleBill"><en>New invoice</en></text>
+        <text name="uwm_form_titleRequest"><en>Request an invoice</en></text>
+        <text name="uwm_form_titleWanted"><en>Standing buy order</en></text>
+        <text name="uwm_form_titleOffer"><en>Standing sell order</en></text>
+        <text name="uwm_form_sendBill"><en>Send invoice</en></text>
+        <text name="uwm_form_sendRequest"><en>Send request</en></text>
+        <text name="uwm_form_post"><en>Post order</en></text>
+        <text name="uwm_form_customer"><en>Customer</en></text>
+        <text name="uwm_form_seller"><en>Seller</en></text>
+        <text name="uwm_form_market"><en>Market</en></text>
+        <text name="uwm_form_marketNote"><en>Posted on the market: any farm in the co-op can take part of it.</en></text>
+        <text name="uwm_form_anyFarm"><en>Any farm</en></text>
+        <text name="uwm_form_goods"><en>Goods</en></text>
+        <text name="uwm_form_pickup"><en>Pickup</en></text>
+        <text name="uwm_form_depot"><en>Utilities Depot</en></text>
+        <text name="uwm_form_fixed"><en>Fixed</en></text>
+        <text name="uwm_form_owner"><en>Owner</en></text>
+        <text name="uwm_form_community"><en>Community</en></text>
+        <text name="uwm_card_title"><en>%s  -  %s</en></text>
+        <text name="uwm_card_titlePallets"><en>%s  -  %s on pallets</en></text>
+        <text name="uwm_card_from"><en>from %s</en></text>
+        <text name="uwm_card_to"><en>to %s</en></text>
+        <text name="uwm_card_discount"><en>%s %% off</en></text>
+        <text name="uwm_sum_waiting"><en>Waiting for you</en></text>
+        <text name="uwm_sum_running"><en>Running</en></text>
+        <text name="uwm_sum_collect"><en>At the depot for you</en></text>
+        <text name="uwm_sum_forSale"><en>Your goods for sale</en></text>
+        <text name="uwm_sum_waitingSub"><en>invoices to accept</en></text>
+        <text name="uwm_sum_runningSub"><en>contracts and deals</en></text>
+        <text name="uwm_sum_collectSub"><en>to collect</en></text>
+        <text name="uwm_sum_forSaleSub"><en>at the depot</en></text>
+        <text name="uwm_tab_count"><en>%s  %d</en></text>
+        <text name="uwm_form_issuerLabel"><en>Issuer</en></text>
+        <text name="uwm_form_palletSizeLabel"><en>Pallet size</en></text>
+        <text name="uwm_form_palletSizes"><en>1,000 / 5,000</en></text>
+        <text name="uwm_form_lineTitle"><en>Invoice line</en></text>
+        <text name="uwm_form_offPill"><en>%s %% off</en></text>
+        <text name="uwm_form_point"><en>Pickup point</en></text>
+        <text name="uwm_form_pointSlurry"><en>Slurry lane (tank)</en></text>
+        <text name="uwm_form_pointManure"><en>Manure pit entrance</en></text>
+        <text name="uwm_form_pointDirect"><en>Delivered directly</en></text>
+        <text name="uwm_form_pointSilo"><en>Farma silo pipe</en></text>
+        <text name="uwm_form_pointPallets"><en>Pallet pad</en></text>
+        <text name="uwm_form_notePallets"><en>New pallets for the buyer appear on the pallet pad.</en></text>
+        <text name="uwm_form_rowPallets"><en>Pallet pad</en></text>
+        <text name="uwm_form_pallet"><en>Pallet  &gt;</en></text>
+        <text name="uwm_form_palletTitle"><en>Pallets</en></text>
+        <text name="uwm_form_palletText"><en>A - Z: your pallets on the map (liters, pallets).</en></text>
+        <text name="uwm_form_palletAll"><en>A - Z: every pallet good in the game.</en></text>
+        <text name="uwm_form_palletChoice"><en>%s  -  %s  (%d pallets)</en></text>
+        <text name="uwm_form_noPallets"><en>You have no pallets to sell on the map.</en></text>
+        <text name="uwm_form_noPalletsThem"><en>That farm has no pallets to sell on the map.</en></text>
+        <text name="uwm_form_bulk"><en>Bulk  &gt;</en></text>
+        <text name="uwm_form_bulkPick"><en>Choose...</en></text>
+        <text name="uwm_form_bulkTitle"><en>Bulk</en></text>
+        <text name="uwm_form_bulkText"><en>A - Z: what can be sold now (free amount).</en></text>
+        <text name="uwm_form_bulkAll"><en>A - Z: every bulk good in the game.</en></text>
+        <text name="uwm_form_bulkChoice"><en>%s  -  %s</en></text>
+        <text name="uwm_form_noBulk"><en>You have no bulk goods to sell (silos and production output).</en></text>
+        <text name="uwm_form_noBulkThem"><en>That farm has no bulk goods to sell.</en></text>
+        <text name="uwm_form_yourStock"><en>Your stock</en></text>
+        <text name="uwm_form_theirStock"><en>Seller's stock</en></text>
+        <text name="uwm_form_reserved"><en>Already reserved</en></text>
+        <text name="uwm_form_atDepot"><en>At the depot for sale</en></text>
+        <text name="uwm_error_depotFull"><en>The depot is full for these goods.</en></text>
+        <text name="uwm_form_free"><en>Free to sell</en></text>
+        <text name="uwm_form_noteDepot"><en>The buyer collects at the depot. The goods come from the seller's farm stock.</en></text>
+        <text name="uwm_form_noteElectricity"><en>Electricity goes straight to the buyer's productions, no pickup.</en></text>
+        <text name="uwm_form_buyer"><en>Customer: %s</en></text>
+        <text name="uwm_form_colGoods"><en>Goods</en></text>
+        <text name="uwm_form_colPickup"><en>Pickup</en></text>
+        <text name="uwm_form_colQty"><en>Qty</en></text>
+        <text name="uwm_form_colUnit"><en>Unit</en></text>
+        <text name="uwm_form_colPrice"><en>Price</en></text>
+        <text name="uwm_form_colRepeat"><en>Repeat</en></text>
+        <text name="uwm_form_colAmount"><en>Amount</en></text>
+        <text name="uwm_form_rowDepot"><en>Depot</en></text>
+        <text name="uwm_form_rowDirect"><en>Direct</en></text>
+        <text name="uwm_form_unitL"><en>l</en></text>
+        <text name="uwm_form_unitKWh"><en>kWh</en></text>
+        <text name="uwm_form_amount"><en>Amount</en></text>
+        <text name="uwm_form_setAmount"><en>Set amount</en></text>
+        <text name="uwm_form_all"><en>All in stock</en></text>
+        <text name="uwm_form_repeat"><en>Repeat</en></text>
+        <text name="uwm_form_total"><en>Total due:</en></text>
+        <text name="uwm_form_totalEach"><en>Due per delivery:</en></text>
+        <text name="uwm_form_totalAll"><en>Everything the seller has in stock when paid</en></text>
+        <text name="uwm_form_untilEnded"><en>until one of you ends it</en></text>
+        <text name="uwm_error_formNoFarm"><en>Pick a farm first.</en></text>
+        <text name="uwm_error_formNoGood"><en>Pick the goods first.</en></text>
+        <!-- discount on invoices (stored on the invoice, shown to both farms) -->
+        <text name="uwm_error_badDiscount"><en>Enter a discount from 0 to 99 %.</en></text>
+        <text name="uwm_discount_percent"><en>%s %% off</en></text>
+        <text name="uwm_discount_money"><en> (%s)</en></text>
+        <text name="uwm_notify_newBillDiscount"><en>%s sent you a bill for %s, %s.</en></text>
+        <text name="uwm_notify_newOrderDiscount"><en>%s sent you an order for %s, %s.</en></text>
+        <text name="uwm_notify_acceptedDiscount"><en>%s accepted your invoice for %s, %s.</en></text>
+        <text name="uwm_cell_discount"><en>, -%s %%</en></text>
+        <text name="uwm_details_discountSeller"><en>Discount: %s %% (-%s)</en></text>
+        <text name="uwm_details_discountBuyer"><en>Discount: %s %% (you save %s)</en></text>
+        <text name="uwm_details_buyerPays"><en>Buyer pays: %s</en></text>
+        <text name="uwm_details_youPay"><en>You pay: %s</en></text>
+        <text name="uwm_form_discount"><en>Discount %</en></text>
+        <text name="uwm_form_colDiscount"><en>Discount</en></text>
+        <text name="uwm_form_percent"><en>%s %%</en></text>
+        <text name="uwm_form_subtotal"><en>Subtotal: %s</en></text>
+        <text name="uwm_form_discountLine"><en>Discount %s %%: -%s</en></text>
+        <text name="uwm_form_discountOff"><en>Discount: %s %% off what is paid</en></text>
     </l10n>
 </modDesc>

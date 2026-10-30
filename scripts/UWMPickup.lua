@@ -36,10 +36,12 @@ function UWMPickup.getCollectable(station, buyerFarmId)
     end
     local supported = station.getSupportedFillTypes ~= nil and station:getSupportedFillTypes() or nil
 
+    -- every fill type the buyer has paid for and not loaded yet (our goods and bulk goods alike)
     local collectable = nil
-    for _, good in ipairs(UtilitiesWasteManagement.goods) do
-        local fillTypeIndex = good.fillTypeIndex
-        if fillTypeIndex ~= FillType.ELECTRICCHARGE and (supported == nil or supported[fillTypeIndex]) then
+    for _, invoice in ipairs(manager.invoices) do
+        local fillTypeIndex = invoice.fillTypeIndex
+        if invoice.buyerFarmId == buyerFarmId and UWMManager.getUsesDepot(fillTypeIndex)
+            and (collectable == nil or collectable[fillTypeIndex] == nil) and (supported == nil or supported[fillTypeIndex]) then
             local liters = manager:getCollectableLiters(buyerFarmId, fillTypeIndex)
             if liters > 0.5 then
                 collectable = collectable or {}

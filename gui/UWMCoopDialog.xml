@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<!-- UWM CO-OP: what's on the books today? (mock-up previews/invoice_wizard_v6_choice.png, user OK'd 2026-10-28)
+     Cards: our image sheet (gui/uwm_ui.dds) for fills, tiles, icons and the arrow; elements named "uwmImg_<cell>"
+     get their cell in UWMCoopDialog.lua. The focused card shows its "focus<Name>" group (outline + green fill). -->
+<GUI onOpen="onOpen" onClose="onClose" onCreate="onCreate">
+    <GuiElement profile="newLayer"/>
+    <Bitmap profile="dialogFullscreenBg"/>
+
+    <GuiElement profile="uwmCoopDialogBg" id="dialogElement">
+        <ThreePartBitmap profile="fs25_dialogBgMiddle"/>
+        <ThreePartBitmap profile="fs25_dialogBgTop"/>
+        <ThreePartBitmap profile="fs25_dialogBgBottom"/>
+
+        <GuiElement profile="fs25_dialogContentContainer">
+            <Text profile="uwmCoopHeader" text="$l10n_uwm_coop_title"/>
+            <ThreePartBitmap profile="uwmCoopHeaderSep"/>
+            <Bitmap profile="uwmCoopHeaderLine" name="uwmImg_solid"/>
+            <Text profile="uwmCoopQuestion" text="$l10n_uwm_coop_question"/>
+            <ThreePartBitmap profile="uwmCoopQuestionSep"/>
+
+            <GuiElement profile="uwmCoopOptions">
+                <!-- invoice a farm -->
+                <GuiElement profile="uwmCoopCard" position="0px 0px">
+                    <Bitmap profile="uwmCoopCardBg" id="bgBill" name="uwmImg_solid"/>
+                    <GuiElement profile="uwmCoopFull" id="focusBill" visible="false">
+                        <Bitmap profile="uwmCoopOutline" name="uwmImg_solid"/>
+                        <Bitmap profile="uwmCoopTint" name="uwmImg_solid"/>
+                    </GuiElement>
+                    <Bitmap profile="uwmCoopTile" id="tileBill" name="uwmImg_tile"/>
+                    <Bitmap profile="uwmCoopIcon" id="iconBill" name="uwmImg_bill"/>
+                    <Text profile="uwmCoopCardLabel" text="$l10n_uwm_coop_bill"/>
+                    <Text profile="uwmCoopCardHint" text="$l10n_uwm_coop_billHint"/>
+                    <Bitmap profile="uwmCoopArrow" id="arrowBill" name="uwmImg_arrow"/>
+                    <Button profile="uwmCoopCardButton" id="cardBill" onClick="onClickBill" onFocus="onCardFocus" onLeave="onCardLeave" onHighlight="onCardFocus" onHighlightRemove="onCardLeave"/>
+                </GuiElement>
+                <!-- request an invoice -->
+                <GuiElement profile="uwmCoopCard" position="0px -112px">
+                    <Bitmap profile="uwmCoopCardBg" id="bgRequest" name="uwmImg_solid"/>
+                    <GuiElement profile="uwmCoopFull" id="focusRequest" visible="false">
+                        <Bitmap profile="uwmCoopOutline" name="uwmImg_solid"/>
+                        <Bitmap profile="uwmCoopTint" name="uwmImg_solid"/>
+                    </GuiElement>
+                    <Bitmap profile="uwmCoopTile" id="tileRequest" name="uwmImg_tile"/>
+                    <Bitmap profile="uwmCoopIcon" id="iconRequest" name="uwmImg_tray"/>
+                    <Text profile="uwmCoopCardLabel" text="$l10n_uwm_coop_request"/>
+                    <Text profile="uwmCoopCardHint" text="$l10n_uwm_coop_requestHint"/>
+                    <Bitmap profile="uwmCoopArrow" id="arrowRequest" name="uwmImg_arrow"/>
+                    <Button profile="uwmCoopCardButton" id="cardRequest" onClick="onClickRequest" onFocus="onCardFocus" onLeave="onCardLeave" onHighlight="onCardFocus" onHighlightRemove="onCardLeave"/>
+                </GuiElement>
+                <!-- standing buy order -->
+                <GuiElement profile="uwmCoopCard" position="0px -224px">
+                    <Bitmap profile="uwmCoopCardBg" id="bgWanted" name="uwmImg_solid"/>
+                    <GuiElement profile="uwmCoopFull" id="focusWanted" visible="false">
+                        <Bitmap profile="uwmCoopOutline" name="uwmImg_solid"/>
+                        <Bitmap profile="uwmCoopTint" name="uwmImg_solid"/>
+                    </GuiElement>
+                    <Bitmap profile="uwmCoopTile" id="tileWanted" name="uwmImg_tile"/>
+                    <Bitmap profile="uwmCoopIcon" id="iconWanted" name="uwmImg_cart"/>
+                    <Text profile="uwmCoopCardLabel" text="$l10n_uwm_coop_wanted"/>
+                    <Text profile="uwmCoopCardHint" text="$l10n_uwm_coop_wantedHint"/>
+                    <Bitmap profile="uwmCoopArrow" id="arrowWanted" name="uwmImg_arrow"/>
+                    <Button profile="uwmCoopCardButton" id="cardWanted" onClick="onClickWanted" onFocus="onCardFocus" onLeave="onCardLeave" onHighlight="onCardFocus" onHighlightRemove="onCardLeave"/>
+                </GuiElement>
+                <!-- standing sell order -->
+                <GuiElement profile="uwmCoopCard" position="0px -336px">
+                    <Bitmap profile="uwmCoopCardBg" id="bgOffer" name="uwmImg_solid"/>
+                    <GuiElement profile="uwmCoopFull" id="focusOffer" visible="false">
+                        <Bitmap profile="uwmCoopOutline" name="uwmImg_solid"/>
+                        <Bitmap profile="uwmCoopTint" name="uwmImg_solid"/>
+                    </GuiElement>
+                    <Bitmap profile="uwmCoopTile" id="tileOffer" name="uwmImg_tile"/>
+                    <Bitmap profile="uwmCoopIcon" id="iconOffer" name="uwmImg_tag"/>
+                    <Text profile="uwmCoopCardLabel" text="$l10n_uwm_coop_offer"/>
+                    <Text profile="uwmCoopCardHint" text="$l10n_uwm_coop_offerHint"/>
+                    <Bitmap profile="uwmCoopArrow" id="arrowOffer" name="uwmImg_arrow"/>
+                    <Button profile="uwmCoopCardButton" id="cardOffer" onClick="onClickOffer" onFocus="onCardFocus" onLeave="onCardLeave" onHighlight="onCardFocus" onHighlightRemove="onCardLeave"/>
+                </GuiElement>
+            </GuiElement>
+        </GuiElement>
+
+        <BoxLayout profile="fs25_dialogButtonBox" size="760px 60px">
+            <Button profile="buttonBack" text="$l10n_uwm_button_cancel" onClick="onClickBack"/>
+        </BoxLayout>
+    </GuiElement>
+
+    <GUIProfiles>
+        <Profile name="uwmCoopDialogBg" extends="fs25_dialogBg">
+            <size value="780px 680px"/>
+        </Profile>
+
+        <Profile name="uwmCoopHeader" extends="fs25_dialogText">
+            <position value="0px -10px"/>
+            <size value="720px 40px"/>
+            <textSize value="24px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textColor value="$preset_colorWhite"/>
+            <textAlignment value="center"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+
+        <Profile name="uwmCoopHeaderSep" extends="fs25_lineSeparatorTopHighlighted" with="anchorTopCenter">
+            <position value="0px -52px"/>
+            <size value="150px 2dp"/>
+        </Profile>
+
+        <Profile name="uwmCoopHeaderLine" extends="baseReference" with="anchorTopCenter">
+            <position value="0px -66px"/>
+            <size value="720px 1dp"/>
+            <imageColor value="1 1 1 0.12"/>
+        </Profile>
+
+        <Profile name="uwmCoopQuestion" extends="fs25_dialogText">
+            <position value="0px -84px"/>
+            <size value="720px 28px"/>
+            <textSize value="17px"/>
+            <textBold value="true"/>
+            <textAlignment value="center"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+
+        <Profile name="uwmCoopQuestionSep" extends="fs25_lineSeparatorTopHighlighted" with="anchorTopCenter">
+            <position value="0px -116px"/>
+            <size value="190px 2dp"/>
+        </Profile>
+
+        <Profile name="uwmCoopOptions" extends="emptyPanel" with="anchorTopCenter">
+            <position value="0px -138px"/>
+            <size value="720px 432px"/>
+        </Profile>
+
+        <Profile name="uwmCoopCard" extends="emptyPanel" with="anchorTopLeft">
+            <size value="720px 96px"/>
+        </Profile>
+
+        <Profile name="uwmCoopFull" extends="emptyPanel" with="anchorTopLeft">
+            <size value="720px 96px"/>
+        </Profile>
+
+        <!-- focus: a 2px green outline (the outline bitmap shows round the tint drawn 2px inside it) -->
+        <Profile name="uwmCoopOutline" extends="baseReference" with="anchorTopLeft">
+            <size value="720px 96px"/>
+            <imageColor value="0.651 0.784 0.235 1"/>
+        </Profile>
+
+        <Profile name="uwmCoopTint" extends="baseReference" with="anchorTopLeft">
+            <position value="2px -2px"/>
+            <size value="716px 92px"/>
+            <imageColor value="0.196 0.235 0.110 1"/>
+        </Profile>
+
+        <Profile name="uwmCoopCardBg" extends="baseReference" with="anchorTopLeft">
+            <position value="1px -1px"/>
+            <size value="718px 94px"/>
+            <imageColor value="0.110 0.114 0.106 1"/>
+        </Profile>
+
+        <Profile name="uwmCoopTile" extends="baseReference" with="anchorTopLeft">
+            <position value="16px -18px"/>
+            <size value="60px 60px"/>
+            <imageColor value="0.157 0.173 0.133 1"/>
+        </Profile>
+
+        <Profile name="uwmCoopIcon" extends="baseReference" with="anchorTopLeft">
+            <position value="22px -24px"/>
+            <size value="48px 48px"/>
+            <imageColor value="0.651 0.784 0.235 1"/>
+        </Profile>
+
+        <Profile name="uwmCoopArrow" extends="baseReference" with="anchorTopLeft">
+            <position value="670px -32px"/>
+            <size value="32px 32px"/>
+            <imageColor value="0.431 0.439 0.412 1"/>
+        </Profile>
+
+        <Profile name="uwmCoopCardLabel" extends="fs25_dialogText">
+            <position value="94px -14px"/>
+            <size value="560px 24px"/>
+            <textSize value="17px"/>
+            <textBold value="true"/>
+            <textUpperCase value="true"/>
+            <textColor value="$preset_colorWhite"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="middle"/>
+        </Profile>
+
+        <Profile name="uwmCoopCardHint" extends="fs25_dialogText">
+            <position value="94px -42px"/>
+            <size value="560px 44px"/>
+            <textSize value="14px"/>
+            <textColor value="$preset_colorWhite_50"/>
+            <textAlignment value="left"/>
+            <textVerticalAlignment value="top"/>
+            <textWrapWidth value="560px"/>
+            <textLineHeightScale value="1.1"/>
+        </Profile>
+
+        <!-- invisible button over a card: click / Enter picks it; stays transparent in every state -->
+        <Profile name="uwmCoopCardButton" extends="baseReference" with="anchorTopLeft">
+            <size value="720px 96px"/>
+            <handleFocus value="true"/>
+            <hideKeyboardGlyph value="true"/>
+            <imageColor value="0 0 0 0"/>
+            <imageFocusedColor value="0 0 0 0"/>
+            <imageHighlightedColor value="0 0 0 0"/>
+            <imageSelectedColor value="0 0 0 0"/>
+            <imageDisabledColor value="0 0 0 0"/>
+            <textColor value="0 0 0 0"/>
+            <textFocusedColor value="0 0 0 0"/>
+            <textHighlightedColor value="0 0 0 0"/>
+            <textSelectedColor value="0 0 0 0"/>
+        </Profile>
+    </GUIProfiles>
+</GUI>

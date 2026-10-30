@@ -48,6 +48,20 @@ function UWM.getGood(fillTypeIndex)
     return nil
 end
 
+-- bulk goods (user, 2026-10-28): anything the game files under BULK (grain, root crops, lime, woodchips ...),
+-- picked from the Bulk list; our own three goods keep their own rows (manure is BULK in the game too)
+function UWM.getIsBulk(fillTypeIndex)
+    if fillTypeIndex == nil or fillTypeIndex == FillType.UNKNOWN or UWM.getGood(fillTypeIndex) ~= nil then
+        return false
+    end
+    return g_fillTypeManager.getIsFillTypeInCategory ~= nil and g_fillTypeManager:getIsFillTypeInCategory(fillTypeIndex, "BULK")
+end
+
+-- may this be put on an invoice / standing order?
+function UWM.getIsTradable(fillTypeIndex)
+    return UWM.getGood(fillTypeIndex) ~= nil or UWM.getIsBulk(fillTypeIndex) or UWMPallets.getIsPalletGood(fillTypeIndex)
+end
+
 function UWM.getGoodName(fillTypeIndex)
     local good = UWM.getGood(fillTypeIndex)
     if good ~= nil then
@@ -223,6 +237,8 @@ end
 
 local function onLoadMission00Finished(mission)
     UWMFrame.register()
+    UWMOrderDialog.register()
+    UWMCoopDialog.register()
 end
 
 -- the finance page asks for "finance_<stat>" without a mod environment; answer ours from this mod's texts

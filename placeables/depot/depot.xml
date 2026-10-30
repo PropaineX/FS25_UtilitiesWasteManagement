@@ -54,17 +54,30 @@
     <triggerMarkers>
         <triggerMarker node="slurryMarker" filename="$data/shared/assets/marker/markerIconLoad.i3d" />
         <triggerMarker node="manureMarker" filename="$data/shared/assets/marker/markerIconLoad.i3d" />
+        <triggerMarker node="siloMarker" filename="$data/shared/assets/marker/markerIconLoad.i3d" />
         <triggerMarker node="officeMarker" filename="$data/shared/assets/marker/markerIconShopping.i3d" />
     </triggerMarkers>
     <uwmDepot officeTrigger="officeTrigger" farmaNode="farma400">
-        <loadingStation node="triggers" fillTypes="LIQUIDMANURE MANURE">
+        <loadingStation node="triggers" fillTypes="LIQUIDMANURE MANURE" fillTypeCategories="BULK">
             <loadTrigger triggerNode="slurryTrigger" fillLitersPerSecond="1000" dischargeNode="slurryDischarge" fillTypes="LIQUIDMANURE" />
             <loadTrigger triggerNode="manureTrigger" fillLitersPerSecond="2000" dischargeNode="manureDischarge" fillTypes="MANURE">
                 <sounds>
                     <loading template="silosActive" />
                 </sounds>
             </loadTrigger>
+            <loadTrigger triggerNode="siloTrigger" fillLitersPerSecond="4000" dischargeNode="siloDischarge" fillTypeCategories="BULK">
+                <sounds>
+                    <loading template="silosActive" />
+                </sounds>
+            </loadTrigger>
         </loadingStation>
+        <palletSpawner>
+            <spawnPlaces>
+                <spawnPlace startNode="pallet1Start" endNode="pallet1End" />
+                <spawnPlace startNode="pallet2Start" endNode="pallet2End" />
+                <spawnPlace startNode="pallet3Start" endNode="pallet3End" />
+            </spawnPlaces>
+        </palletSpawner>
     </uwmDepot>
     <i3dMappings>
         <i3dMapping id="clearAreaStart" node="0&gt;0|0" />
@@ -84,9 +97,18 @@
         <i3dMapping id="mapPosition" node="0&gt;6|3" />
         <i3dMapping id="officeMarker" node="0&gt;6|4" />
         <i3dMapping id="officeTrigger" node="0&gt;6|5" />
-        <i3dMapping id="slurryDischarge" node="0&gt;6|6" />
-        <i3dMapping id="slurryMarker" node="0&gt;6|7" />
-        <i3dMapping id="slurryTrigger" node="0&gt;6|8" />
+        <i3dMapping id="slurryDischarge" node="0&gt;6|15" />
+        <i3dMapping id="slurryMarker" node="0&gt;6|16" />
+        <i3dMapping id="slurryTrigger" node="0&gt;6|17" />
+        <i3dMapping id="siloTrigger" node="0&gt;6|14" />
+        <i3dMapping id="siloDischarge" node="0&gt;6|12" />
+        <i3dMapping id="siloMarker" node="0&gt;6|13" />
+        <i3dMapping id="pallet1Start" node="0&gt;6|7" />
+        <i3dMapping id="pallet1End" node="0&gt;6|6" />
+        <i3dMapping id="pallet2Start" node="0&gt;6|9" />
+        <i3dMapping id="pallet2End" node="0&gt;6|8" />
+        <i3dMapping id="pallet3Start" node="0&gt;6|11" />
+        <i3dMapping id="pallet3End" node="0&gt;6|10" />
         <i3dMapping id="farma400" node="0&gt;7" />
     </i3dMappings>
 </placeable>

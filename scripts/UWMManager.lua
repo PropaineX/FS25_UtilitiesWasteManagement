@@ -65,6 +65,9 @@ function UWMManager.new(isServer)
     self.allowMultipleDepots = false
     self.membershipTimer = 0
 
+    self.depotReturns = {}      -- goods on their way home that didn't fit yet: {farmId, fillTypeIndex, liters}
+    self.needsDepotMove = false -- an older save: its open sales still have their goods at the sellers' farms
+
     return self
 end
 
@@ -200,20 +203,48 @@ function UWMManager:transferMoney(invoice, amount)
     invoice.totalMoney = invoice.totalMoney + amount
 end
 
+UWMManager.DISCOUNT_NOTICES = {uwm_notify_newBill = true, uwm_notify_newOrder = true, uwm_notify_accepted = true}
+
+-- "10 % off" (+ ", -$33" when the money is known)
+function UWMManager.getDiscountText(invoice, money)
+    local UWM = UtilitiesWasteManagement
+    local percent = string.format(UWM.getText("uwm_discount_percent"), UWMManager.formatPercent(invoice.discountPercent))
+    if money ~= nil and money > 0 then
+        return percent .. string.format(UWM.getText("uwm_discount_money"), UWM.formatMoney(money))
+    end
+    return percent
+end
+
+function UWMManager.formatPercent(percent)
+    if math.abs(percent - math.floor(percent + 0.5)) < 0.01 then
+        return string.format("%d", math.floor(percent + 0.5))
+    end
+    return string.format("%.1f", percent)
+end
+
 -- detail: optional text for a third %s (the numbers of a receipt)
 function UWMManager:notify(farmId, key, invoice, detail)
     if farmId == nil or farmId == FarmManager.SPECTATOR_FARM_ID then
         return
     end
     local otherName = invoice ~= nil and UWMManager.getFarmName(invoice:getOtherFarmId(farmId)) or ""
+    -- a discounted invoice: new / accepted messages get the "...Discount" text with the percent as third %s
+    if invoice ~= nil and invoice.discountPercent > 0 and detail == nil and UWMManager.DISCOUNT_NOTICES[key] then
+        key = key .. "Discount"
+        detail = UWMManager.getDiscountText(invoice)
+    end
     UWMNotifyEvent.sendEvent(farmId, key, otherName, invoice ~= nil and invoice.fillTypeIndex or FillType.UNKNOWN, detail)
 end
 
 -- "4,123 kWh delivered, $1,443 paid, $0 refunded" for the whole invoice so far
 function UWMManager.getReceiptLine(invoice)
     local UWM = UtilitiesWasteManagement
-    return string.format(UWM.getText("uwm_receipt_line"), UWM.formatAmount(invoice.fillTypeIndex, invoice.totalLiters),
+    local line = string.format(UWM.getText("uwm_receipt_line"), UWM.formatAmount(invoice.fillTypeIndex, invoice.totalLiters),
         UWM.formatMoney(invoice.totalMoney), UWM.formatMoney(invoice.totalRefund))
+    if invoice.discountPercent > 0 then
+        line = line .. ", " .. UWMManager.getDiscountText(invoice, invoice:getDiscountOnPaid(invoice.totalMoney))
+    end
+    return line
 end
 
 -- both farms get the numbers when an invoice is over
@@ -226,6 +257,231 @@ end
 function UWMManager:finish(invoice, state)
     invoice.state = state
     invoice.finishedDay = g_currentMission.environment.currentMonotonicDay
+    -- whatever is still in the depot for it goes back to the seller
+    if invoice.isPallet then
+        UWMPallets.cancel(invoice)
+    end
+    if invoice.depotLiters > UWMManager.EPSILON then
+        self:returnFromDepot(invoice.sellerFarmId, invoice.fillTypeIndex, invoice.depotLiters, invoice.isPallet, invoice.palletSize)
+    end
+    invoice.depotLiters = 0
+end
+
+----------------------------------------------------------------------------------------------------------------
+-- Goods in the depot (server; user's rule 2026-10-28): manure / slurry put up for sale leave the seller's storage
+-- and wait in the depot until the buyer loads them; what isn't sold goes back home. Each depot part holds
+-- DEPOT_CAPACITY liters for all farms together (slurry tank, manure pit, silo for the rest).
+----------------------------------------------------------------------------------------------------------------
+
+UWMManager.DEPOT_CAPACITY = 100000000
+UWMManager.PALLET_CHECK_INTERVAL = 5000
+
+-- liters per new pallet: one of UWMPallets.SIZES (anything else -> the smallest)
+function UWMManager.getPalletSize(size)
+    for _, allowed in ipairs(UWMPallets.SIZES) do
+        if size == allowed then
+            return size
+        end
+    end
+    return UWMPallets.SIZES[1]
+end
+
+function UWMManager.getDepotPart(fillTypeIndex, isPallet)
+    if isPallet then
+        return "pallets"
+    elseif fillTypeIndex == FillType.LIQUIDMANURE then
+        return "tank"
+    elseif fillTypeIndex == FillType.MANURE then
+        return "pit"
+    end
+    return "silo"
+end
+
+function UWMManager.getUsesDepot(fillTypeIndex)
+    return fillTypeIndex ~= FillType.ELECTRICCHARGE
+end
+
+-- liters in one depot part, all farms
+function UWMManager:getDepotUsed(part)
+    local used = 0
+    for _, invoice in ipairs(self.invoices) do
+        if UWMManager.getDepotPart(invoice.fillTypeIndex, invoice.isPallet) == part then
+            used = used + invoice.depotLiters
+        end
+    end
+    for _, listing in ipairs(self.listings) do
+        if UWMManager.getDepotPart(listing.fillTypeIndex, listing.isPallet) == part then
+            used = used + listing.depotLiters
+        end
+    end
+    for _, entry in ipairs(self.depotReturns) do
+        if UWMManager.getDepotPart(entry.fillTypeIndex, entry.isPallet) == part then
+            used = used + entry.liters
+        end
+    end
+    return used
+end
+
+-- a farm's goods of one type in the depot (for sale, or waiting to go home); isPallet: only pallet / only loose
+function UWMManager:getDepotLitersOf(farmId, fillTypeIndex, isPallet)
+    local function counts(other)
+        return isPallet == nil or (other == true) == isPallet
+    end
+    local liters = 0
+    for _, invoice in ipairs(self.invoices) do
+        if invoice.sellerFarmId == farmId and invoice.fillTypeIndex == fillTypeIndex and counts(invoice.isPallet) then
+            liters = liters + invoice.depotLiters
+        end
+    end
+    for _, listing in ipairs(self.listings) do
+        if listing.farmId == farmId and listing.fillTypeIndex == fillTypeIndex and counts(listing.isPallet) then
+            liters = liters + listing.depotLiters
+        end
+    end
+    for _, entry in ipairs(self.depotReturns) do
+        if entry.farmId == farmId and entry.fillTypeIndex == fillTypeIndex and counts(entry.isPallet) then
+            liters = liters + entry.liters
+        end
+    end
+    return liters
+end
+
+-- the farm's free goods at home: storages, or its pallets on the map
+function UWMManager.getHomeAvailable(farmId, fillTypeIndex, isPallet)
+    if isPallet then
+        return UWMPallets.getStock(farmId, fillTypeIndex)
+    end
+    return UWMStock.getAvailable(farmId, fillTypeIndex, nil)
+end
+
+-- may `liters` of the farm's free stock go into the depot? returns ok, l10n key
+function UWMManager:getCanMoveToDepot(farmId, fillTypeIndex, liters, isPallet)
+    if UWMManager.getHomeAvailable(farmId, fillTypeIndex, isPallet) < liters - UWMManager.EPSILON then
+        return false, "uwm_error_noStock"
+    end
+    if self:getDepotUsed(UWMManager.getDepotPart(fillTypeIndex, isPallet)) + liters > UWMManager.DEPOT_CAPACITY + UWMManager.EPSILON then
+        return false, "uwm_error_depotFull"
+    end
+    return true, nil
+end
+
+-- takes the liters out of the farm's storages (or off its pallets); returns what was taken (check getCanMoveToDepot first)
+function UWMManager:moveToDepot(farmId, fillTypeIndex, liters, isPallet)
+    if liters <= UWMManager.EPSILON then
+        return 0
+    end
+    if isPallet then
+        return UWMPallets.take(farmId, fillTypeIndex, liters)
+    end
+    return UWMStock.take(farmId, fillTypeIndex, liters)
+end
+
+-- goods back into the farm's storages; what doesn't fit waits in the depot and is tried again every day.
+-- Pallet goods go home as new pallets on the depot's pad, for the seller to fetch.
+function UWMManager:returnFromDepot(farmId, fillTypeIndex, liters, isPallet, palletSize)
+    if liters <= UWMManager.EPSILON then
+        return
+    end
+    if isPallet then
+        local entry = {farmId = farmId, fillTypeIndex = fillTypeIndex, liters = liters, isPallet = true, palletSize = palletSize or UWMPallets.SIZES[1]}
+        table.insert(self.depotReturns, entry)
+        self:queuePalletReturn(entry)
+        self:setDirty()
+        return
+    end
+    local left = UWMStock.giveBack(farmId, fillTypeIndex, liters) or 0
+    if left > UWMManager.EPSILON then
+        table.insert(self.depotReturns, {farmId = farmId, fillTypeIndex = fillTypeIndex, liters = left})
+    end
+    self:setDirty()
+end
+
+-- pallet goods going home: spawned on the pad for the seller; the entry shrinks as pallets come out
+function UWMManager:queuePalletReturn(entry)
+    if not self.isServer or UWMPallets.getQueued(entry) > 0 then
+        return
+    end
+    UWMPallets.deliver(entry.farmId, entry.fillTypeIndex, entry.liters, entry.palletSize, function(delta)
+        entry.liters = entry.liters - delta
+        if entry.liters <= UWMManager.EPSILON then
+            for i, other in ipairs(self.depotReturns) do
+                if other == entry then
+                    table.remove(self.depotReturns, i)
+                    break
+                end
+            end
+        end
+        self:setDirty()
+    end, entry)
+end
+
+-- a paid pallet invoice: its pallets come out on the pad for the buyer (what isn't queued yet)
+function UWMManager:queuePalletDelivery(invoice)
+    if not self.isServer or not invoice.isPallet or invoice.state ~= STATE.ACTIVE then
+        return
+    end
+    local want = math.min(invoice.owedLiters, invoice.depotLiters) - UWMPallets.getQueued(invoice)
+    if want <= UWMManager.EPSILON then
+        return
+    end
+    UWMPallets.deliver(invoice.buyerFarmId, invoice.fillTypeIndex, want, invoice.palletSize, function(delta)
+        invoice.depotLiters = math.max(invoice.depotLiters - delta, 0)
+        invoice.owedLiters = math.max(invoice.owedLiters - delta, 0)
+        invoice.totalLiters = invoice.totalLiters + delta
+        if self:finishIfDone(invoice) then
+            self:notify(invoice.sellerFarmId, "uwm_notify_collected", invoice)
+            self:sendReceipt(invoice)
+        end
+        self:setDirty()
+    end, invoice)
+end
+
+-- after loading / a new depot: every pallet still owed or going home gets queued again
+function UWMManager:queueAllPallets()
+    for _, invoice in ipairs(self.invoices) do
+        self:queuePalletDelivery(invoice)
+    end
+    for _, entry in ipairs(self.depotReturns) do
+        if entry.isPallet then
+            self:queuePalletReturn(entry)
+        end
+    end
+end
+
+function UWMManager:retryDepotReturns()
+    local waiting = self.depotReturns
+    self.depotReturns = {}
+    for _, entry in ipairs(waiting) do
+        if entry.isPallet then
+            -- still coming out on the pad: keep it, queue again if it fell out of the queue
+            table.insert(self.depotReturns, entry)
+            self:queuePalletReturn(entry)
+        else
+            self:returnFromDepot(entry.farmId, entry.fillTypeIndex, entry.liters)
+        end
+    end
+end
+
+-- an older save: open manure / slurry sales get their goods moved now (as much as the seller still has)
+function UWMManager:moveOldSalesToDepot()
+    self.needsDepotMove = false
+    for _, invoice in ipairs(self.invoices) do
+        if invoice.state == STATE.ACTIVE and UWMManager.getUsesDepot(invoice.fillTypeIndex) and not invoice.isPallet
+            and invoice.owedLiters > invoice.depotLiters + UWMManager.EPSILON then
+            local want = math.min(invoice.owedLiters - invoice.depotLiters, UWMStock.getStock(invoice.sellerFarmId, invoice.fillTypeIndex))
+            invoice.depotLiters = invoice.depotLiters + self:moveToDepot(invoice.sellerFarmId, invoice.fillTypeIndex, want)
+        end
+    end
+    for _, listing in ipairs(self.listings) do
+        if listing:getIsOpen() and listing:getIsOffer() and UWMManager.getUsesDepot(listing.fillTypeIndex) and not listing.isPallet
+            and listing.remaining > listing.depotLiters + UWMManager.EPSILON then
+            local want = math.min(listing.remaining - listing.depotLiters, UWMStock.getStock(listing.farmId, listing.fillTypeIndex))
+            listing.depotLiters = listing.depotLiters + self:moveToDepot(listing.farmId, listing.fillTypeIndex, want)
+            -- an offer can only sell what really is in the depot
+            listing.remaining = math.min(listing.remaining, listing.depotLiters)
+        end
+    end
+    self:setDirty()
 end
 
 ----------------------------------------------------------------------------------------------------------------
@@ -327,7 +583,7 @@ function UWMManager:runRequest(action, userId, data)
 end
 
 function UWMManager:createInvoice(farmId, data, targets)
-    if data == nil or UtilitiesWasteManagement.getGood(data.fillTypeIndex) == nil then
+    if data == nil or not UtilitiesWasteManagement.getIsTradable(data.fillTypeIndex) then
         return false, "uwm_error_badGood"
     end
 
@@ -341,6 +597,13 @@ function UWMManager:createInvoice(farmId, data, targets)
     end
     if not (data.pricePer1000 >= 0) then
         return false, "uwm_error_badPrice"
+    end
+    local discount = data.discountPercent or 0
+    if not (discount >= 0 and discount < 100) then
+        return false, "uwm_error_badDiscount"
+    end
+    if data.isPallet and not UWMPallets.getIsPalletGood(data.fillTypeIndex) then
+        return false, "uwm_error_badGood"
     end
     if data.repeatDays ~= UWMInvoice.REPEAT_ONCE and data.repeatDays ~= UWMInvoice.REPEAT_DAILY
         and data.repeatDays ~= UWMInvoice.REPEAT_WEEKLY then
@@ -360,6 +623,9 @@ function UWMManager:createInvoice(farmId, data, targets)
     invoice.amountMode = data.amountMode
     invoice.liters = data.amountMode == UWMInvoice.AMOUNT.FIXED and data.liters or 0
     invoice.pricePer1000 = data.pricePer1000
+    invoice.discountPercent = discount
+    invoice.isPallet = data.isPallet == true
+    invoice.palletSize = UWMManager.getPalletSize(data.palletSize)
     invoice.repeatDays = data.repeatDays
     invoice.createdDay = g_currentMission.environment.currentMonotonicDay
 
@@ -367,6 +633,15 @@ function UWMManager:createInvoice(farmId, data, targets)
     if not isBill then
         invoice.reserve = data.reserve and not invoice:getIsElectricity()
         invoice.targets = targets or {}
+    end
+
+    -- a bill for a set amount of manure / slurry: the goods go to the depot now (an order: when the seller accepts)
+    if isBill and UWMManager.getUsesDepot(invoice.fillTypeIndex) and invoice.amountMode == UWMInvoice.AMOUNT.FIXED then
+        local canMove, moveKey = self:getCanMoveToDepot(invoice.sellerFarmId, invoice.fillTypeIndex, invoice.liters, invoice.isPallet)
+        if not canMove then
+            return false, moveKey
+        end
+        invoice.depotLiters = self:moveToDepot(invoice.sellerFarmId, invoice.fillTypeIndex, invoice.liters, invoice.isPallet)
     end
 
     self:addInvoice(invoice)
@@ -412,6 +687,8 @@ function UWMManager:acceptInvoice(farmId, invoice, reserve, targets)
         invoice.state = STATE.ACTIVE
     end
     invoice.nextPeriodDay = g_currentMission.environment.currentMonotonicDay + invoice.repeatDays
+    -- paid before it became active: its pallets are queued now
+    self:queuePalletDelivery(invoice)
 
     self:notify(invoice.creatorFarmId, "uwm_notify_accepted", invoice)
     if self:finishIfDone(invoice) then
@@ -520,8 +797,9 @@ function UWMManager:runPeriod(invoice)
         if liters <= UWMManager.EPSILON then
             return false, "uwm_error_noSpace"
         end
-        if invoice.pricePer1000 > 0 and not invoice.prepaid then
-            liters = math.min(liters, UWMManager.getFarmBalance(invoice.buyerFarmId) / invoice.pricePer1000 * 1000)
+        local paidPrice = invoice:getPaidPricePer1000()
+        if paidPrice > 0 and not invoice.prepaid then
+            liters = math.min(liters, UWMManager.getFarmBalance(invoice.buyerFarmId) / paidPrice * 1000)
         end
         if liters <= UWMManager.EPSILON then
             return false, "uwm_error_noMoney"
@@ -538,22 +816,42 @@ function UWMManager:runPeriod(invoice)
         invoice.statusKey = ""
         return true, nil, added, invoice:getPrice(added)
     else
+        -- goods already in the depot for it and not paid yet (a bill moves them when sent) count first,
+        -- the rest comes out of the seller's storage now
+        local unpaidInDepot = math.max(invoice.depotLiters - invoice.owedLiters, 0)
         if invoice.amountMode == UWMInvoice.AMOUNT.ALL then
-            -- liters already paid for and still waiting to be collected are part of the stock: don't bill them twice
-            liters = UWMStock.getAvailable(invoice.sellerFarmId, invoice.fillTypeIndex, invoice) - invoice.owedLiters
+            local home = invoice.isPallet and UWMPallets.getStock(invoice.sellerFarmId, invoice.fillTypeIndex)
+                or UWMStock.getAvailable(invoice.sellerFarmId, invoice.fillTypeIndex, invoice)
+            liters = unpaidInDepot + home
             if liters <= UWMManager.EPSILON then
                 return false, "uwm_error_noStock"
             end
         else
             liters = invoice.liters
         end
+        local fromHome = math.max(liters - unpaidInDepot, 0)
+        if fromHome > UWMManager.EPSILON then
+            local canMove, moveKey = self:getCanMoveToDepot(invoice.sellerFarmId, invoice.fillTypeIndex, fromHome, invoice.isPallet)
+            if not canMove then
+                return false, moveKey
+            end
+        end
 
         local price = invoice:getPrice(liters)
         if not invoice.prepaid and price > UWMManager.getFarmBalance(invoice.buyerFarmId) then
             return false, "uwm_error_noMoney"
         end
+        if fromHome > UWMManager.EPSILON then
+            local moved = self:moveToDepot(invoice.sellerFarmId, invoice.fillTypeIndex, fromHome, invoice.isPallet)
+            invoice.depotLiters = invoice.depotLiters + moved
+            -- the storage gave less than it showed: bill only what arrived
+            liters = liters - (fromHome - moved)
+            price = invoice:getPrice(liters)
+        end
         self:transferMoney(invoice, price)
         invoice.owedLiters = invoice.owedLiters + liters
+        -- pallet goods: the buyer's pallets come out on the depot's pad now
+        self:queuePalletDelivery(invoice)
         invoice.statusKey = ""
         return true, nil, liters, price
     end
@@ -582,11 +880,15 @@ end
 function UWMManager:finishListing(listing, state)
     listing.state = state
     listing.finishedDay = g_currentMission.environment.currentMonotonicDay
+    if listing.depotLiters > UWMManager.EPSILON then
+        self:returnFromDepot(listing.farmId, listing.fillTypeIndex, listing.depotLiters, listing.isPallet, listing.palletSize)
+    end
+    listing.depotLiters = 0
 end
 
 -- data: UWMListing with kind, fillTypeIndex, liters, pricePer1000; targets: WANTED electricity, the poster's productions
 function UWMManager:postListing(farmId, data, targets)
-    if data == nil or UtilitiesWasteManagement.getGood(data.fillTypeIndex) == nil then
+    if data == nil or not UtilitiesWasteManagement.getIsTradable(data.fillTypeIndex) then
         return false, "uwm_error_badGood"
     end
     if data.kind ~= UWMListing.KIND.OFFER and data.kind ~= UWMListing.KIND.WANTED then
@@ -612,11 +914,25 @@ function UWMManager:postListing(farmId, data, targets)
     listing.remaining = data.liters
     listing.pricePer1000 = data.pricePer1000
     listing.createdDay = g_currentMission.environment.currentMonotonicDay
+    listing.isPallet = data.isPallet == true
+    listing.palletSize = UWMManager.getPalletSize(data.palletSize)
+    if listing.isPallet and not UWMPallets.getIsPalletGood(listing.fillTypeIndex) then
+        return false, "uwm_error_badGood"
+    end
 
     if listing:getIsOffer() then
         -- the whole amount must be free in stock now: from here on it is held for the buyers
-        if UWMStock.getAvailable(farmId, listing.fillTypeIndex, nil) < listing.liters - UWMManager.EPSILON then
+        if UWMManager.getHomeAvailable(farmId, listing.fillTypeIndex, listing.isPallet) < listing.liters - UWMManager.EPSILON then
             return false, "uwm_error_listingNoStock"
+        end
+        -- manure / slurry: held in the depot, not at home (electricity stays reserved in the poster's productions)
+        if UWMManager.getUsesDepot(listing.fillTypeIndex) then
+            local canMove, moveKey = self:getCanMoveToDepot(farmId, listing.fillTypeIndex, listing.liters, listing.isPallet)
+            if not canMove then
+                return false, moveKey == "uwm_error_noStock" and "uwm_error_listingNoStock" or moveKey
+            end
+            listing.depotLiters = self:moveToDepot(farmId, listing.fillTypeIndex, listing.liters, listing.isPallet)
+            listing.remaining = math.min(listing.remaining, listing.depotLiters)
         end
     else
         if listing:getIsElectricity() then
@@ -689,6 +1005,8 @@ function UWMManager:tradeListing(farmId, listing, liters, targets)
     invoice.targets = isOffer and (targets or {}) or listing.targets
     invoice.listingId = listing.id
     invoice.prepaid = not isOffer
+    invoice.isPallet = listing.isPallet
+    invoice.palletSize = listing.palletSize
     invoice.state = STATE.ACTIVE
 
     if invoice:getIsElectricity() and #UWMStock.resolveTargets(invoice) == 0 then
@@ -697,14 +1015,22 @@ function UWMManager:tradeListing(farmId, listing, liters, targets)
 
     -- what the offer held for this deal moves over to the new invoice
     local before = listing.remaining
+    local depotBefore = listing.depotLiters
     listing.remaining = before - liters
-    if UWMStock.getAvailable(invoice.sellerFarmId, invoice.fillTypeIndex, invoice) < liters - UWMManager.EPSILON then
+    if isOffer and UWMManager.getUsesDepot(listing.fillTypeIndex) then
+        -- the goods are in the depot already: they now belong to this deal
+        local fromOffer = math.min(liters, listing.depotLiters)
+        listing.depotLiters = listing.depotLiters - fromOffer
+        invoice.depotLiters = fromOffer
+    elseif (invoice:getIsElectricity() and UWMStock.getAvailable(invoice.sellerFarmId, invoice.fillTypeIndex, invoice)
+            or UWMManager.getHomeAvailable(invoice.sellerFarmId, invoice.fillTypeIndex, invoice.isPallet)) < liters - UWMManager.EPSILON then
         listing.remaining = before
         return false, isOffer and "uwm_error_noStock" or "uwm_error_listingNoStock"
     end
     local ok, key, moved, money = self:runPeriod(invoice)
     if not ok then
         listing.remaining = before
+        listing.depotLiters = depotBefore
         return false, key
     end
     -- electricity: only what fitted into the buyer's productions counts
@@ -766,7 +1092,7 @@ end
 
 -- invoice belongs to this buyer and fill type (and seller, when one is given)
 local function isCollectFor(invoice, farmId, fillTypeIndex, sellerFarmId)
-    return invoice.buyerFarmId == farmId and invoice.fillTypeIndex == fillTypeIndex
+    return invoice.buyerFarmId == farmId and invoice.fillTypeIndex == fillTypeIndex and not invoice.isPallet
         and (sellerFarmId == nil or invoice.sellerFarmId == sellerFarmId)
 end
 
@@ -775,13 +1101,13 @@ function UWMManager:getCollectableLiters(farmId, fillTypeIndex, sellerFarmId)
     local total = 0
     for _, invoice in ipairs(self.invoices) do
         if invoice.state == STATE.ACTIVE and isCollectFor(invoice, farmId, fillTypeIndex, sellerFarmId) then
-            total = total + math.min(invoice.owedLiters, UWMStock.getAvailable(invoice.sellerFarmId, fillTypeIndex, invoice))
+            total = total + math.min(invoice.owedLiters, invoice.depotLiters)
         end
     end
     return total
 end
 
--- takes up to `liters` from the sellers' stock for the buyer's paid invoices, oldest invoice first;
+-- takes up to `liters` out of the depot for the buyer's paid invoices, oldest invoice first;
 -- returns the liters taken (the caller puts them into the buyer's vehicle)
 function UWMManager:collect(farmId, fillTypeIndex, liters, sellerFarmId)
     local collected = 0
@@ -791,10 +1117,10 @@ function UWMManager:collect(farmId, fillTypeIndex, liters, sellerFarmId)
         end
         if invoice.state == STATE.ACTIVE and isCollectFor(invoice, farmId, fillTypeIndex, sellerFarmId)
             and invoice.owedLiters > UWMManager.EPSILON then
-            local want = math.min(liters - collected, invoice.owedLiters,
-                UWMStock.getAvailable(invoice.sellerFarmId, fillTypeIndex, invoice))
+            local want = math.min(liters - collected, invoice.owedLiters, invoice.depotLiters)
             if want > 0 then
-                local taken = UWMStock.take(invoice.sellerFarmId, fillTypeIndex, want)
+                local taken = want
+                invoice.depotLiters = invoice.depotLiters - taken
                 invoice.owedLiters = math.max(invoice.owedLiters - taken, 0)
                 invoice.totalLiters = invoice.totalLiters + taken
                 collected = collected + taken
@@ -815,7 +1141,7 @@ function UWMManager:returnCollected(farmId, fillTypeIndex, liters, sellerFarmId)
         local invoice = self.invoices[i]
         if isCollectFor(invoice, farmId, fillTypeIndex, sellerFarmId) and invoice.totalLiters > 0 then
             local back = math.min(liters, invoice.totalLiters)
-            UWMStock.giveBack(invoice.sellerFarmId, fillTypeIndex, back)
+            invoice.depotLiters = invoice.depotLiters + back
             invoice.totalLiters = invoice.totalLiters - back
             invoice.owedLiters = invoice.owedLiters + back
             if invoice.state == STATE.DONE then
@@ -837,6 +1163,7 @@ function UWMManager:onDayChanged()
         return
     end
     self:chargeDepotShares()
+    self:retryDepotReturns()
     local today = g_currentMission.environment.currentMonotonicDay
     for _, invoice in ipairs(self.invoices) do
         if invoice.state == STATE.ACTIVE and invoice.repeatDays > 0 and today >= invoice.nextPeriodDay then
@@ -851,6 +1178,9 @@ function UWMManager:onDayChanged()
                 local UWM = UtilitiesWasteManagement
                 local periodKey = invoice:getIsElectricity() and "uwm_receipt_periodDelivered" or "uwm_receipt_periodPaid"
                 local line = string.format(UWM.getText(periodKey), UWM.formatAmount(invoice.fillTypeIndex, liters), UWM.formatMoney(money))
+                if invoice.discountPercent > 0 then
+                    line = line .. ", " .. UWMManager.getDiscountText(invoice, invoice:getDiscountOnPaid(money))
+                end
                 self:notify(invoice.buyerFarmId, "uwm_notify_contractRun", invoice, line)
                 self:notify(invoice.sellerFarmId, "uwm_notify_contractRun", invoice, line)
             else
@@ -1200,6 +1530,18 @@ function UWMManager:setDirty()
 end
 
 function UWMManager:update(dt)
+    if self.isServer and self.needsDepotMove then
+        self:moveOldSalesToDepot()
+    end
+    if self.isServer then
+        -- every few seconds: anything owed as pallets that isn't queued (after loading, a new depot, a missed call)
+        self.palletCheckTimer = (self.palletCheckTimer or 0) - dt
+        if self.palletCheckTimer <= 0 then
+            self.palletCheckTimer = UWMManager.PALLET_CHECK_INTERVAL
+            self:queueAllPallets()
+        end
+        UWMPallets.update(dt)
+    end
     if self.isServer then
         self.membershipTimer = self.membershipTimer - dt
         if self.membershipTimer <= 0 then
@@ -1315,6 +1657,15 @@ function UWMManager:saveToXMLFile(filename)
     end
     self:pruneHistory()
     xmlFile:setInt("utilitiesWasteManagement#nextId", self.nextId)
+    xmlFile:setInt("utilitiesWasteManagement#depotStock", 1)
+    for i, entry in ipairs(self.depotReturns) do
+        local key = string.format("utilitiesWasteManagement.depotReturns.return(%d)", i - 1)
+        xmlFile:setInt(key .. "#farmId", entry.farmId)
+        xmlFile:setString(key .. "#fillType", g_fillTypeManager:getFillTypeNameByIndex(entry.fillTypeIndex))
+        xmlFile:setFloat(key .. "#liters", entry.liters)
+        xmlFile:setBool(key .. "#isPallet", entry.isPallet == true)
+        xmlFile:setInt(key .. "#palletSize", entry.palletSize or 1000)
+    end
     for i, invoice in ipairs(self.invoices) do
         invoice:saveToXMLFile(xmlFile, string.format("utilitiesWasteManagement.invoices.invoice(%d)", i - 1))
     end
@@ -1372,6 +1723,17 @@ function UWMManager:loadFromXMLFile(filename)
         end
     end)
     self.nextListingId = math.max(self.nextListingId, xmlFile:getInt("utilitiesWasteManagement.listings#nextId", 1))
+    xmlFile:iterate("utilitiesWasteManagement.depotReturns.return", function(_, key)
+        local fillTypeIndex = g_fillTypeManager:getFillTypeIndexByName(xmlFile:getString(key .. "#fillType", ""))
+        local liters = xmlFile:getFloat(key .. "#liters", 0)
+        if fillTypeIndex ~= nil and liters > 0 then
+            local isPallet = xmlFile:getBool(key .. "#isPallet", false)
+            table.insert(self.depotReturns, {farmId = xmlFile:getInt(key .. "#farmId", 0), fillTypeIndex = fillTypeIndex, liters = liters,
+                isPallet = isPallet or nil, palletSize = isPallet and xmlFile:getInt(key .. "#palletSize", 1000) or nil})
+        end
+    end)
+    -- saved before goods moved into the depot: move them once the farms' storages are loaded (first update)
+    self.needsDepotMove = xmlFile:getInt("utilitiesWasteManagement#depotStock", 0) < 1
     xmlFile:delete()
     print(string.format("%s loaded %d invoice(s), %d standing order(s)", UtilitiesWasteManagement.TAG, #self.invoices, #self.listings))
 end
